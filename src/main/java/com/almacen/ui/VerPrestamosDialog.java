@@ -2,11 +2,7 @@ package com.almacen.ui;
 
 import com.almacen.database.DatabaseManager;
 import com.almacen.model.Prestamo;
-import com.almacen.model.ReportePrestamoItem;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import com.almacen.report.ReportesPdf;
 import javax.swing.*;
 import com.toedter.calendar.JDateChooser;
 import javax.swing.table.DefaultTableModel;
@@ -450,208 +446,23 @@ public class VerPrestamosDialog extends JDialog {
     }
 
     private void generarReportePdf() {
-        try {
-            DatabaseManager dbManager = DatabaseManager.getInstance();
-            if (!dbManager.isConnected()) {
-                Notificaciones.showMessageDialog(this,
-                    "No hay conexión a la base de datos",
-                    "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            List<ReportePrestamoItem> items = dbManager.obtenerReportePrestamosActivos();
-            if (items.isEmpty()) {
-                Notificaciones.showMessageDialog(this,
-                    "No hay préstamos activos para reportar",
-                    "Información", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-            File archivo = File.createTempFile("reporte_prestamos_activos_", ".pdf");
-            archivo.deleteOnExit();
-
-            try (PDDocument document = new PDDocument()) {
-                PDPage page = new PDPage();
-                document.addPage(page);
-                PDPageContentStream content = new PDPageContentStream(document, page);
-                float margin = 40;
-                float y = 740;
-
-                content.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                y = writeLine(content, "Reporte de préstamos activos", margin, y);
-                content.setFont(PDType1Font.HELVETICA, 10);
-                y = writeLine(content, "Incluye cliente (normalizado), residente/sobrestante y herramientas", margin, y - 8);
-                y -= 16;
-
-                java.util.LinkedHashMap<String, java.util.List<ReportePrestamoItem>> grupos = new java.util.LinkedHashMap<>();
-                for (ReportePrestamoItem item : items) {
-                    String cliente = normalizarNombre(item.getNombreCliente());
-                    String residente = safe(item.getResidenteSobrestante());
-                    String key = cliente + "||" + residente;
-                    grupos.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(item);
-                }
-
-                float colHerr = margin;
-                float colCat = margin + 230;
-                float colCant = margin + 390;
-                float colFecha = margin + 450;
-                float tableRight = margin + 560;
-
-                for (java.util.Map.Entry<String, java.util.List<ReportePrestamoItem>> entry : grupos.entrySet()) {
-                    String[] partes = entry.getKey().split("\\|\\|", -1);
-                    String cliente = partes.length > 0 ? partes[0] : "";
-                    String residente = partes.length > 1 ? partes[1] : "";
-
-                    if (y < margin + 80) {
-                        content.close();
-                        page = new PDPage();
-                        document.addPage(page);
-                        content = new PDPageContentStream(document, page);
-                        y = 740;
-                    }
-
-                    content.setFont(PDType1Font.HELVETICA_BOLD, 11);
-                    y = writeLine(content, "Cliente: " + cliente, margin, y);
-                    content.setFont(PDType1Font.HELVETICA, 10);
-                    y = writeLine(content, "Residente/Sobrestante: " + residente, margin, y);
-                    y -= 4;
-
-                    y = drawGeneralHeader(content, y, 18, colHerr, colCat, colCant, colFecha, tableRight);
-                    content.setFont(PDType1Font.HELVETICA, 10);
-
-                    for (ReportePrestamoItem item : entry.getValue()) {
-                        if (y < margin + 60) {
-                            content.close();
-                            page = new PDPage();
-                            document.addPage(page);
-                            content = new PDPageContentStream(document, page);
-                            y = 740;
-                            y = drawGeneralHeader(content, y, 18, colHerr, colCat, colCant, colFecha, tableRight);
-                            content.setFont(PDType1Font.HELVETICA, 10);
-                        }
-
-                        String herramienta = safe(item.getNombreHerramienta());
-                        String categoria = safe(item.getCategoria());
-                        String fecha = item.getFechaPrestamo() != null
-                            ? item.getFechaPrestamo().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                            : "";
-                        drawGeneralRowLine(content, y, 18, colHerr, colCat, colCant, colFecha, tableRight);
-                        float textY = y - 5;
-                        writeText(content, herramienta, colHerr + 4, textY);
-                        writeText(content, categoria, colCat + 4, textY);
-                        writeText(content, String.valueOf(item.getCantidad()), colCant + 4, textY);
-                        writeText(content, fecha, colFecha + 4, textY);
-                        y -= 18;
-                    }
-
-                    y -= 8;
-                }
-
-                content.close();
-                document.save(archivo);
-            }
-            abrirPdfEnNavegador(archivo);
-        } catch (Exception e) {
-            Notificaciones.showMessageDialog(this,
-                "Error al generar reporte: " + e.getMessage(),
-                "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        PdfViewer.generarYAbrir(this, ReportesPdf::prestamosActivos, "No hay préstamos activos para reportar");
     }
 
     private void generarReportePdfPorHerramienta(String herramienta) {
-        try {
-            DatabaseManager dbManager = DatabaseManager.getInstance();
-            if (!dbManager.isConnected()) {
-                Notificaciones.showMessageDialog(this,
-                    "No hay conexión a la base de datos",
-                    "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            if (herramienta == null || herramienta.trim().isEmpty()) {
-                Notificaciones.showMessageDialog(this,
-                    "Seleccione una herramienta",
-                    "Información", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-            List<ReportePrestamoItem> items = dbManager.obtenerReportePrestamosActivosPorHerramienta(herramienta);
-            if (items.isEmpty()) {
-                Notificaciones.showMessageDialog(this,
-                    "No hay préstamos activos para esa herramienta",
-                    "Información", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-            File archivo = File.createTempFile("reporte_prestamos_herramienta_", ".pdf");
-            archivo.deleteOnExit();
-
-            try (PDDocument document = new PDDocument()) {
-                PDPage page = new PDPage();
-                document.addPage(page);
-                PDPageContentStream content = new PDPageContentStream(document, page);
-                float margin = 40;
-                float y = 740;
-
-                content.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                y = writeLine(content, "Reporte de préstamos activos por herramienta", margin, y);
-                content.setFont(PDType1Font.HELVETICA, 10);
-                y = writeLine(content, "Herramienta: " + herramienta, margin, y - 4);
-                y -= 16;
-
-                float colHerr = margin;
-                float colCant = margin + 230;
-                float colCliente = margin + 300;
-                float colRes = margin + 430;
-                float tableRight = margin + 520;
-
-                y = drawHerramientaHeader(content, y, 18, colHerr, colCant, colCliente, colRes, tableRight);
-                content.setFont(PDType1Font.HELVETICA, 10);
-
-                for (ReportePrestamoItem item : items) {
-                    if (y < margin + 60) {
-                        content.close();
-                        page = new PDPage();
-                        document.addPage(page);
-                        content = new PDPageContentStream(document, page);
-                        y = 740;
-                        y = drawHerramientaHeader(content, y, 18, colHerr, colCant, colCliente, colRes, tableRight);
-                        content.setFont(PDType1Font.HELVETICA, 10);
-                    }
-                    drawHerramientaRowLine(content, y, 18, colHerr, colCant, colCliente, colRes, tableRight);
-                    float textY = y - 5;
-                    writeText(content, safe(item.getNombreHerramienta()), colHerr + 4, textY);
-                    writeText(content, String.valueOf(item.getCantidad()), colCant + 4, textY);
-                    writeText(content, safe(item.getNombreCliente()), colCliente + 4, textY);
-                    writeText(content, safe(item.getResidenteSobrestante()), colRes + 4, textY);
-                    y -= 18;
-                }
-
-                content.close();
-                document.save(archivo);
-            }
-            abrirPdfEnNavegador(archivo);
-        } catch (Exception e) {
+        if (herramienta == null || herramienta.trim().isEmpty()) {
             Notificaciones.showMessageDialog(this,
-                "Error al generar reporte: " + e.getMessage(),
-                "Error", JOptionPane.ERROR_MESSAGE);
+                "Seleccione una herramienta",
+                "Información", JOptionPane.INFORMATION_MESSAGE);
+            return;
         }
+        PdfViewer.generarYAbrir(this, () -> ReportesPdf.prestamosPorHerramienta(herramienta),
+            "No hay préstamos activos para esa herramienta");
     }
 
     private void abrirSeleccionReporte() {
         SeleccionReporteDialog dialog = new SeleccionReporteDialog(this);
         dialog.setVisible(true);
-    }
-
-    private void abrirPdfEnNavegador(File archivo) {
-        try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(archivo.toURI());
-            } else {
-                Notificaciones.showMessageDialog(this,
-                    "Vista previa generada en: " + archivo.getAbsolutePath(),
-                    "Información", JOptionPane.INFORMATION_MESSAGE);
-            }
-        } catch (Exception e) {
-            Notificaciones.showMessageDialog(this,
-                "Error al abrir PDF: " + e.getMessage(),
-                "Error", JOptionPane.ERROR_MESSAGE);
-        }
     }
 
     private class SeleccionReporteDialog extends JDialog {
@@ -739,155 +550,6 @@ public class VerPrestamosDialog extends JDialog {
         }
     }
 
-
-    private float writeLine(PDPageContentStream content, String text, float x, float y) throws Exception {
-        content.beginText();
-        content.newLineAtOffset(x, y);
-        content.showText(text);
-        content.endText();
-        return y - 14;
-    }
-
-    private void writeText(PDPageContentStream content, String text, float x, float y) throws Exception {
-        content.beginText();
-        content.newLineAtOffset(x, y);
-        content.showText(text);
-        content.endText();
-    }
-
-    private float drawHerramientaHeader(PDPageContentStream content, float y, float rowHeight,
-                                        float colHerr, float colCant, float colCliente, float colRes, float tableRight) throws Exception {
-        float headerTop = y + 4;
-        float textY = y - 5;
-        content.setNonStrokingColor(new Color(230, 230, 230));
-        content.addRect(colHerr - 4, y - rowHeight + 4, tableRight - colHerr + 8, rowHeight);
-        content.fill();
-        content.setNonStrokingColor(Color.BLACK);
-        content.setLineWidth(0.5f);
-        content.moveTo(colHerr - 4, headerTop);
-        content.lineTo(tableRight + 4, headerTop);
-        content.stroke();
-        drawHerramientaVerticalLines(content, y, rowHeight, colHerr, colCant, colCliente, colRes, tableRight);
-
-        content.setFont(PDType1Font.HELVETICA_BOLD, 10);
-        writeText(content, "Herramienta", colHerr + 4, textY);
-        writeText(content, "Cantidad", colCant + 4, textY);
-        writeText(content, "Cliente", colCliente + 4, textY);
-        writeText(content, "Residente", colRes + 4, textY);
-        return y - rowHeight;
-    }
-
-    private void drawHerramientaRowLine(PDPageContentStream content, float y, float rowHeight,
-                                        float colHerr, float colCant, float colCliente, float colRes, float tableRight) throws Exception {
-        content.setLineWidth(0.4f);
-        content.moveTo(colHerr - 4, y - rowHeight + 4);
-        content.lineTo(tableRight + 4, y - rowHeight + 4);
-        content.stroke();
-        drawHerramientaVerticalLines(content, y, rowHeight, colHerr, colCant, colCliente, colRes, tableRight);
-    }
-
-    private void drawHerramientaVerticalLines(PDPageContentStream content, float y, float rowHeight,
-                                              float colHerr, float colCant, float colCliente, float colRes, float tableRight) throws Exception {
-        float top = y + 4;
-        float bottom = y - rowHeight + 4;
-        float left = colHerr - 4;
-        float right = tableRight + 4;
-        content.setLineWidth(0.4f);
-        content.moveTo(left, top);
-        content.lineTo(left, bottom);
-        content.stroke();
-        content.moveTo(colCant - 4, top);
-        content.lineTo(colCant - 4, bottom);
-        content.stroke();
-        content.moveTo(colCliente - 4, top);
-        content.lineTo(colCliente - 4, bottom);
-        content.stroke();
-        content.moveTo(colRes - 4, top);
-        content.lineTo(colRes - 4, bottom);
-        content.stroke();
-        content.moveTo(right, top);
-        content.lineTo(right, bottom);
-        content.stroke();
-    }
-
-    private float drawGeneralHeader(PDPageContentStream content, float y, float rowHeight,
-                                    float colHerr, float colCat, float colCant, float colFecha, float tableRight) throws Exception {
-        float headerTop = y + 4;
-        float textY = y - 5;
-        content.setNonStrokingColor(new Color(230, 230, 230));
-        content.addRect(colHerr - 4, y - rowHeight + 4, tableRight - colHerr + 8, rowHeight);
-        content.fill();
-        content.setNonStrokingColor(Color.BLACK);
-        content.setLineWidth(0.5f);
-        content.moveTo(colHerr - 4, headerTop);
-        content.lineTo(tableRight + 4, headerTop);
-        content.stroke();
-        drawGeneralVerticalLines(content, y, rowHeight, colHerr, colCat, colCant, colFecha, tableRight);
-
-        content.setFont(PDType1Font.HELVETICA_BOLD, 10);
-        writeText(content, "Herramienta", colHerr + 4, textY);
-        writeText(content, "Categoría", colCat + 4, textY);
-        writeText(content, "Cantidad", colCant + 4, textY);
-        writeText(content, "Fecha", colFecha + 4, textY);
-        return y - rowHeight;
-    }
-
-    private void drawGeneralRowLine(PDPageContentStream content, float y, float rowHeight,
-                                    float colHerr, float colCat, float colCant, float colFecha, float tableRight) throws Exception {
-        content.setLineWidth(0.4f);
-        content.moveTo(colHerr - 4, y - rowHeight + 4);
-        content.lineTo(tableRight + 4, y - rowHeight + 4);
-        content.stroke();
-        drawGeneralVerticalLines(content, y, rowHeight, colHerr, colCat, colCant, colFecha, tableRight);
-    }
-
-    private void drawGeneralVerticalLines(PDPageContentStream content, float y, float rowHeight,
-                                          float colHerr, float colCat, float colCant, float colFecha, float tableRight) throws Exception {
-        float top = y + 4;
-        float bottom = y - rowHeight + 4;
-        float left = colHerr - 4;
-        float right = tableRight + 4;
-        content.setLineWidth(0.4f);
-        content.moveTo(left, top);
-        content.lineTo(left, bottom);
-        content.stroke();
-        content.moveTo(colCat - 4, top);
-        content.lineTo(colCat - 4, bottom);
-        content.stroke();
-        content.moveTo(colCant - 4, top);
-        content.lineTo(colCant - 4, bottom);
-        content.stroke();
-        content.moveTo(colFecha - 4, top);
-        content.lineTo(colFecha - 4, bottom);
-        content.stroke();
-        content.moveTo(right, top);
-        content.lineTo(right, bottom);
-        content.stroke();
-    }
-
-    private String normalizarNombre(String nombre) {
-        if (nombre == null) {
-            return "";
-        }
-        String limpio = nombre.trim().replaceAll("\\s+", " ").toLowerCase();
-        String[] partes = limpio.split(" ");
-        StringBuilder sb = new StringBuilder();
-        for (String p : partes) {
-            if (p.isEmpty()) {
-                continue;
-            }
-            sb.append(Character.toUpperCase(p.charAt(0)));
-            if (p.length() > 1) {
-                sb.append(p.substring(1));
-            }
-            sb.append(" ");
-        }
-        return sb.toString().trim();
-    }
-
-    private String safe(String valor) {
-        return valor == null ? "" : valor.trim();
-    }
 
     private long calcularDiasPrestado(LocalDateTime inicio, LocalDateTime fin) {
         if (inicio == null) {

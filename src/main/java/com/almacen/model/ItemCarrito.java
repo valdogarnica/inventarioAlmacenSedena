@@ -36,4 +36,12 @@ public class ItemCarrito {
     public String getCategoria() {
         return herramienta.getCategoria();
     }
+
+    public String getUnidad() {
+        return herramienta.getUnidad();
+    }
+
+    public String getProveedorNombre() {
+        return herramienta.getProveedorNombre();
+    }
 }

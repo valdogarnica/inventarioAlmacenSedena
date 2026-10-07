@@ -13,7 +13,9 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainWindow extends JFrame {
     private JTextField txtBusqueda;
@@ -32,6 +34,32 @@ public class MainWindow extends JFrame {
     private JComboBox<Integer> comboTamanoPagina;
     private int paginaActual = 1;
     private int totalRegistros = 0;
+
+    // Menú paginado
+    private static final Color MENU_BG = new Color(27, 42, 74);
+    private static final String PAG_PRESTAMO = "prestamo";
+    private static final String PAG_PRESTAMOS = "prestamos";
+    private static final String PAG_INVENTARIO = "inventario";
+    private static final String PAG_REMISIONES = "remisiones";
+    private static final String PAG_PROVEEDORES = "proveedores";
+    private static final String PAG_CATALOGOS = "catalogos";
+    private static final String PAG_REPORTES = "reportes";
+    private static final String PAG_CONFIGURACION = "configuracion";
+    private static final int COL_ID = 0;
+    private static final int COL_NOMBRE = 1;
+    private static final int COL_STOCK = 6;
+    private static final int COL_CANTIDAD = 7;
+    private static final int COL_AGREGAR = 8;
+    private CardLayout cardLayout;
+    private JPanel panelPaginas;
+    private JPanel menuLateral;
+    private JLabel lblTituloPagina;
+    private final ButtonGroup grupoMenu = new ButtonGroup();
+    private final Map<String, JToggleButton> botonesMenu = new HashMap<>();
+    private final Map<String, JComponent> paginas = new HashMap<>();
+    private final Map<String, String> titulosPaginas = new HashMap<>();
+    private final List<String> ordenPaginas = new ArrayList<>();
+    private String paginaVisible = PAG_PRESTAMO;
     
     public MainWindow() {
         carrito = new ArrayList<>();
@@ -42,50 +70,31 @@ public class MainWindow extends JFrame {
     private void initComponents() {
         setTitle("Sistema de Inventario de Almacén");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1200, 700);
+        setSize(1280, 760);
+        setMinimumSize(new Dimension(1000, 620));
         setLocationRelativeTo(null);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         cargarIconoApp();
-        
-        // Menú
-        JMenuBar menuBar = new JMenuBar();
-        JMenu menuArchivo = new JMenu("Archivo");
-        JMenuItem menuItemConfig = new JMenuItem("Configurar Base de Datos");
-        menuItemConfig.addActionListener(e -> abrirConfiguracion());
-        menuArchivo.add(menuItemConfig);
-        menuArchivo.addSeparator();
-        JMenuItem menuItemSalir = new JMenuItem("Salir");
-        menuItemSalir.addActionListener(e -> System.exit(0));
-        menuArchivo.add(menuItemSalir);
-        
-        JMenu menuGestion = new JMenu("Gestión");
-        JMenuItem menuItemAgregar = new JMenuItem("Agregar Herramienta");
-        menuItemAgregar.addActionListener(e -> agregarHerramienta());
-        menuGestion.add(menuItemAgregar);
-        JMenuItem menuItemPrestamos = new JMenuItem("Ver Préstamos");
-        menuItemPrestamos.addActionListener(e -> verPrestamos());
-        menuGestion.add(menuItemPrestamos);
-        JMenuItem menuItemInventario = new JMenuItem("Ver Inventario");
-        menuItemInventario.addActionListener(e -> verInventario());
-        menuGestion.add(menuItemInventario);
-        JMenuItem menuItemCategorias = new JMenuItem("Categorías");
-        menuItemCategorias.addActionListener(e -> verCategorias());
-        menuGestion.add(menuItemCategorias);
-        JMenuItem menuItemIngresos = new JMenuItem("Registrar Ingreso de Stock");
-        menuItemIngresos.addActionListener(e -> registrarIngreso());
-        menuGestion.add(menuItemIngresos);
-        
-        menuBar.add(menuArchivo);
-        menuBar.add(menuGestion);
-        setJMenuBar(menuBar);
-        
-        // Panel principal
-        JPanel panelPrincipal = new JPanel(new BorderLayout(16, 16));
-        panelPrincipal.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        panelPrincipal.setBackground(UIStyles.BG);
-        
-        // Panel superior - Información del empleado
-        JPanel panelEmpleado = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        JPanel raiz = new JPanel(new BorderLayout());
+        raiz.setBackground(UIStyles.BG);
+
+        // Contenido paginado
+        cardLayout = new CardLayout();
+        panelPaginas = new JPanel(cardLayout);
+        panelPaginas.setOpaque(false);
+
+        // Encabezado de la página actual + empleado
+        JPanel encabezado = new JPanel(new BorderLayout());
+        encabezado.setBackground(UIStyles.CARD);
+        encabezado.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, UIStyles.BORDER),
+            BorderFactory.createEmptyBorder(10, 18, 10, 18)));
+        lblTituloPagina = new JLabel();
+        lblTituloPagina.setFont(lblTituloPagina.getFont().deriveFont(Font.BOLD, 20f));
+        lblTituloPagina.setForeground(UIStyles.TEXT);
+        encabezado.add(lblTituloPagina, BorderLayout.WEST);
+        JPanel panelEmpleado = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         panelEmpleado.setOpaque(false);
         JLabel lblEmpleadoTitulo = new JLabel("Empleado:");
         lblEmpleadoTitulo.setForeground(UIStyles.TEXT);
@@ -97,11 +106,135 @@ public class MainWindow extends JFrame {
         JButton btnCambiarEmpleado = new JButton("Cambiar");
         btnCambiarEmpleado.addActionListener(e -> configurarEmpleado());
         UIStyles.styleSecondaryButton(btnCambiarEmpleado);
-        btnCambiarEmpleado.setPreferredSize(new Dimension(120, 34));
         UIStyles.applySvgIcon(btnCambiarEmpleado, "/icons/edit.svg", 16);
         panelEmpleado.add(btnCambiarEmpleado);
-        panelPrincipal.add(panelEmpleado, BorderLayout.NORTH);
-        
+        encabezado.add(panelEmpleado, BorderLayout.EAST);
+
+        JPanel centro = new JPanel(new BorderLayout());
+        centro.setOpaque(false);
+        centro.add(encabezado, BorderLayout.NORTH);
+        JPanel envoltura = new JPanel(new BorderLayout());
+        envoltura.setOpaque(false);
+        envoltura.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        envoltura.add(panelPaginas, BorderLayout.CENTER);
+        centro.add(envoltura, BorderLayout.CENTER);
+
+        // Menú lateral paginado
+        menuLateral = new JPanel();
+        menuLateral.setLayout(new BoxLayout(menuLateral, BoxLayout.Y_AXIS));
+        menuLateral.setBackground(MENU_BG);
+        menuLateral.setBorder(BorderFactory.createEmptyBorder(16, 10, 16, 10));
+        menuLateral.setPreferredSize(new Dimension(230, 100));
+        JLabel lblApp = new JLabel("<html><b>Almacén</b><br><span style='font-size:9px'>Inventario y préstamos</span></html>");
+        lblApp.setForeground(Color.WHITE);
+        lblApp.setFont(lblApp.getFont().deriveFont(17f));
+        lblApp.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lblApp.setBorder(BorderFactory.createEmptyBorder(0, 8, 18, 0));
+        menuLateral.add(lblApp);
+
+        agregarSeccionMenu("PRÉSTAMOS");
+        agregarPagina(PAG_PRESTAMO, "Nuevo préstamo", "/icons/add.svg", crearPaginaPrestamo());
+        agregarPagina(PAG_PRESTAMOS, "Préstamos registrados", "/icons/search.svg", crearPaginaPrestamos());
+        agregarSeccionMenu("ALMACÉN");
+        agregarPagina(PAG_INVENTARIO, "Inventario", "/icons/enlace.svg", new InventarioPanel());
+        agregarPagina(PAG_REMISIONES, "Remisiones", "/icons/save.svg", new RemisionesPanel(this::getEmpleado));
+        agregarPagina(PAG_PROVEEDORES, "Proveedores", "/icons/edit.svg", new ProveedoresPanel());
+        agregarPagina(PAG_CATALOGOS, "Categorías, tipos y unidades", "/icons/refresh.svg", new CatalogosPanel());
+        agregarSeccionMenu("CONSULTAS");
+        agregarPagina(PAG_REPORTES, "Reportes", "/icons/report.svg", new ReportesPanel());
+        agregarPagina(PAG_CONFIGURACION, "Configuración", "/icons/edit.svg", crearPaginaConfiguracion());
+        menuLateral.add(Box.createVerticalGlue());
+        JLabel lblAtajos = new JLabel("<html>Ctrl+1 … Ctrl+8 para cambiar de página</html>");
+        lblAtajos.setForeground(new Color(160, 175, 205));
+        lblAtajos.setFont(lblAtajos.getFont().deriveFont(11f));
+        lblAtajos.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lblAtajos.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
+        menuLateral.add(lblAtajos);
+
+        raiz.add(menuLateral, BorderLayout.WEST);
+        raiz.add(centro, BorderLayout.CENTER);
+        setContentPane(raiz);
+        registrarAtajos();
+    }
+
+    private void agregarSeccionMenu(String titulo) {
+        JLabel lbl = new JLabel(titulo);
+        lbl.setForeground(new Color(140, 158, 194));
+        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 11f));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lbl.setBorder(BorderFactory.createEmptyBorder(12, 8, 6, 0));
+        menuLateral.add(lbl);
+    }
+
+    private void agregarPagina(String id, String titulo, String icono, JComponent pagina) {
+        panelPaginas.add(pagina, id);
+        paginas.put(id, pagina);
+        titulosPaginas.put(id, titulo);
+        ordenPaginas.add(id);
+
+        JToggleButton boton = new JToggleButton(titulo);
+        boton.setHorizontalAlignment(SwingConstants.LEFT);
+        boton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        boton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        boton.setFocusPainted(false);
+        boton.putClientProperty("FlatLaf.style",
+            "background: #1B2A4A; foreground: #DCE4F5; selectedBackground: #2D6CDF; selectedForeground: #FFFFFF; " +
+            "hoverBackground: #26385F; pressedBackground: #2D6CDF; borderWidth: 0; focusWidth: 0; arc: 10; margin: 8,12,8,12");
+        try {
+            com.formdev.flatlaf.extras.FlatSVGIcon svg = new com.formdev.flatlaf.extras.FlatSVGIcon(icono.substring(1), 16, 16);
+            svg.setColorFilter(new com.formdev.flatlaf.extras.FlatSVGIcon.ColorFilter(c -> Color.WHITE));
+            boton.setIcon(svg);
+            boton.setIconTextGap(10);
+        } catch (Exception ignored) {
+            // Sin icono
+        }
+        boton.addActionListener(e -> mostrarPagina(id));
+        grupoMenu.add(boton);
+        botonesMenu.put(id, boton);
+        menuLateral.add(boton);
+        menuLateral.add(Box.createVerticalStrut(4));
+    }
+
+    private void registrarAtajos() {
+        JRootPane rootPane = getRootPane();
+        for (int i = 0; i < ordenPaginas.size() && i < 9; i++) {
+            String id = ordenPaginas.get(i);
+            KeyStroke ks = KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_1 + i,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK);
+            rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ks, "pagina_" + id);
+            rootPane.getActionMap().put("pagina_" + id, new AbstractAction() {
+                @Override
+                public void actionPerformed(java.awt.event.ActionEvent e) {
+                    mostrarPagina(id);
+                }
+            });
+        }
+    }
+
+    private void mostrarPagina(String id) {
+        cardLayout.show(panelPaginas, id);
+        lblTituloPagina.setText(titulosPaginas.get(id));
+        JToggleButton boton = botonesMenu.get(id);
+        if (boton != null && !boton.isSelected()) {
+            boton.setSelected(true);
+        }
+        paginaVisible = id;
+        JComponent pagina = paginas.get(id);
+        if (pagina instanceof Pagina && DatabaseManager.getInstance().isConnected()) {
+            ((Pagina) pagina).alMostrar();
+        }
+    }
+
+    private String getEmpleado() {
+        String empleado = lblEmpleado.getText();
+        return "No configurado".equals(empleado) ? "" : empleado;
+    }
+
+    /** Página "Nuevo préstamo": búsqueda de material + carrito. */
+    private JComponent crearPaginaPrestamo() {
+        JPanel panelPrincipal = new JPanel(new BorderLayout(16, 16));
+        panelPrincipal.setOpaque(false);
+
         // Panel central dividido
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPane.setOpaque(false);
@@ -114,11 +247,12 @@ public class MainWindow extends JFrame {
         // Búsqueda
         JPanel panelBusqueda = new JPanel(new BorderLayout(10, 10));
         panelBusqueda.setOpaque(false);
-        JLabel lblBuscar = new JLabel("Buscar herramienta:");
+        JLabel lblBuscar = new JLabel("Buscar herramienta / material:");
         lblBuscar.setForeground(UIStyles.TEXT);
         panelBusqueda.add(lblBuscar, BorderLayout.WEST);
         txtBusqueda = new JTextField();
         txtBusqueda.setPreferredSize(new Dimension(320, 32));
+        txtBusqueda.setToolTipText("Nombre, categoría, tipo, unidad o proveedor");
         configurarBusquedaEnVivo();
         JButton btnBuscar = new JButton("Buscar");
         btnBuscar.addActionListener(e -> buscarHerramientas());
@@ -139,17 +273,19 @@ public class MainWindow extends JFrame {
         tablaHerramientas.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaHerramientas.getTableHeader().setReorderingAllowed(false);
         tablaHerramientas.setRowHeight(28);
-        tablaHerramientas.getColumnModel().getColumn(4).setPreferredWidth(90);
-        tablaHerramientas.getColumnModel().getColumn(5).setPreferredWidth(110);
-        tablaHerramientas.getColumnModel().getColumn(4).setCellEditor(new CantidadSpinnerEditor());
-        tablaHerramientas.getColumnModel().getColumn(4).setCellRenderer(new CantidadSpinnerRenderer());
-        tablaHerramientas.getColumnModel().getColumn(5).setCellRenderer(new BotonAgregarRenderer());
-        tablaHerramientas.getColumnModel().getColumn(5).setCellEditor(new BotonAgregarEditor());
+        tablaHerramientas.getColumnModel().getColumn(COL_ID).setPreferredWidth(45);
+        tablaHerramientas.getColumnModel().getColumn(COL_NOMBRE).setPreferredWidth(200);
+        tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setPreferredWidth(90);
+        tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setPreferredWidth(70);
+        tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setCellEditor(new CantidadSpinnerEditor());
+        tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setCellRenderer(new CantidadSpinnerRenderer());
+        tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setCellRenderer(new BotonAgregarRenderer());
+        tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setCellEditor(new BotonAgregarEditor());
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaHerramientas);
         DefaultTableCellRenderer centerRenderer = UIStyles.createCenteredNumberRenderer();
-        tablaHerramientas.getColumnModel().getColumn(0).setCellRenderer(centerRenderer); // ID
-        tablaHerramientas.getColumnModel().getColumn(3).setCellRenderer(centerRenderer); // Stock
+        tablaHerramientas.getColumnModel().getColumn(COL_ID).setCellRenderer(centerRenderer);
+        tablaHerramientas.getColumnModel().getColumn(COL_STOCK).setCellRenderer(centerRenderer);
         JScrollPane scrollHerramientas = new JScrollPane(tablaHerramientas);
         scrollHerramientas.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         JPanel cardResultados = UIStyles.createCard("Resultados", scrollHerramientas);
@@ -190,7 +326,7 @@ public class MainWindow extends JFrame {
         JPanel panelDerecho = new JPanel(new BorderLayout(12, 12));
         panelDerecho.setOpaque(false);
         
-        String[] columnasCarrito = {"Nombre", "Categoría", "Cantidad"};
+        String[] columnasCarrito = {"Nombre", "Proveedor", "Unidad", "Cantidad"};
         modeloCarrito = new DefaultTableModel(columnasCarrito, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -204,13 +340,15 @@ public class MainWindow extends JFrame {
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaCarrito);
         DefaultTableCellRenderer centerRendererCarrito = UIStyles.createCenteredNumberRenderer();
-        tablaCarrito.getColumnModel().getColumn(2).setCellRenderer(centerRendererCarrito); // Cantidad
+        tablaCarrito.getColumnModel().getColumn(3).setCellRenderer(centerRendererCarrito); // Cantidad
         JScrollPane scrollCarrito = new JScrollPane(tablaCarrito);
         JPanel cardCarrito = UIStyles.createCard("Herramientas seleccionadas", scrollCarrito);
         
         // Botones del carrito
-        JPanel panelBotonesCarrito = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        JPanel panelBotonesCarrito = new JPanel(new BorderLayout(8, 8));
         panelBotonesCarrito.setOpaque(false);
+        JPanel panelBotonesSecundarios = new JPanel(new GridLayout(1, 2, 8, 0));
+        panelBotonesSecundarios.setOpaque(false);
         btnQuitarCarrito = new JButton("Quitar del Carrito");
         btnQuitarCarrito.addActionListener(e -> quitarDelCarrito());
         btnLimpiarCarrito = new JButton("Limpiar Carrito");
@@ -221,26 +359,96 @@ public class MainWindow extends JFrame {
         UIStyles.styleSecondaryButton(btnQuitarCarrito);
         UIStyles.styleDangerButton(btnLimpiarCarrito);
         UIStyles.stylePrimaryButton(btnRealizarPrestamo);
-        Dimension btnSize = new Dimension(145, 34);
-        btnQuitarCarrito.setPreferredSize(btnSize);
-        btnLimpiarCarrito.setPreferredSize(btnSize);
-        btnRealizarPrestamo.setPreferredSize(new Dimension(165, 34));
         UIStyles.applySvgIcon(btnQuitarCarrito, "/icons/cancel.svg", 16);
         UIStyles.applySvgIcon(btnLimpiarCarrito, "/icons/delete.svg", 16);
         UIStyles.applySvgIcon(btnRealizarPrestamo, "/icons/save.svg", 16);
-        panelBotonesCarrito.add(btnQuitarCarrito);
-        panelBotonesCarrito.add(btnLimpiarCarrito);
-        panelBotonesCarrito.add(btnRealizarPrestamo);
+        btnRealizarPrestamo.setPreferredSize(new Dimension(165, 40));
+        panelBotonesSecundarios.add(btnQuitarCarrito);
+        panelBotonesSecundarios.add(btnLimpiarCarrito);
+        panelBotonesCarrito.add(panelBotonesSecundarios, BorderLayout.NORTH);
+        panelBotonesCarrito.add(btnRealizarPrestamo, BorderLayout.SOUTH);
         cardCarrito.add(panelBotonesCarrito, BorderLayout.SOUTH);
         panelDerecho.add(cardCarrito, BorderLayout.CENTER);
         
         splitPane.setLeftComponent(panelIzquierdo);
         splitPane.setRightComponent(panelDerecho);
-        splitPane.setDividerLocation(600);
-        splitPane.setResizeWeight(0.5);
+        splitPane.setDividerLocation(780);
+        splitPane.setResizeWeight(0.62);
         
         panelPrincipal.add(splitPane, BorderLayout.CENTER);
-        add(panelPrincipal);
+        return new PaginaPrestamo(panelPrincipal);
+    }
+
+    /** Envoltura para refrescar los resultados al volver a la página de préstamo. */
+    private class PaginaPrestamo extends JPanel implements Pagina {
+        PaginaPrestamo(JComponent contenido) {
+            super(new BorderLayout());
+            setOpaque(false);
+            add(contenido, BorderLayout.CENTER);
+        }
+
+        @Override
+        public void alMostrar() {
+            cargarPagina(paginaActual);
+        }
+    }
+
+    /** Página "Préstamos registrados": accesos a activos, devueltos y materiales prestados. */
+    private JComponent crearPaginaPrestamos() {
+        JPanel grid = new JPanel(new GridLayout(1, 3, 14, 14));
+        grid.setOpaque(false);
+        grid.add(tarjetaAccion("Préstamos activos",
+            "Consultar préstamos, registrar devoluciones (totales o parciales) y generar reportes.",
+            "Abrir", "/icons/search.svg", this::verPrestamos));
+        grid.add(tarjetaAccion("Préstamos devueltos",
+            "Historial de préstamos ya devueltos con sus observaciones.",
+            "Abrir", "/icons/search.svg", () -> new VerPrestamosDevueltosDialog(this).setVisible(true)));
+        grid.add(tarjetaAccion("Materiales prestados",
+            "Qué material está fuera, cuánto, con quién y desde cuándo.",
+            "Abrir", "/icons/search.svg", () -> new MaterialesPrestadosDialog(this).setVisible(true)));
+        JPanel pagina = new JPanel(new BorderLayout());
+        pagina.setOpaque(false);
+        pagina.add(grid, BorderLayout.NORTH);
+        return pagina;
+    }
+
+    /** Página "Configuración": base de datos y empleado. */
+    private JComponent crearPaginaConfiguracion() {
+        JPanel grid = new JPanel(new GridLayout(1, 3, 14, 14));
+        grid.setOpaque(false);
+        grid.add(tarjetaAccion("Base de datos",
+            "Elegir la carpeta y la base de datos SQLite, y la carpeta de fotos.",
+            "Configurar", "/icons/edit.svg", () -> {
+                abrirConfiguracion();
+                mostrarPagina(paginaVisible);
+            }));
+        grid.add(tarjetaAccion("Empleado en turno",
+            "Cambiar el nombre del empleado que registra préstamos y recibe remisiones.",
+            "Cambiar", "/icons/edit.svg", this::configurarEmpleado));
+        grid.add(tarjetaAccion("Salir",
+            "Cerrar el sistema.",
+            "Salir", "/icons/cancel.svg", () -> System.exit(0)));
+        JPanel pagina = new JPanel(new BorderLayout());
+        pagina.setOpaque(false);
+        pagina.add(grid, BorderLayout.NORTH);
+        return pagina;
+    }
+
+    private JPanel tarjetaAccion(String titulo, String descripcion, String textoBoton, String icono, Runnable accion) {
+        JPanel cuerpo = new JPanel(new BorderLayout(8, 12));
+        cuerpo.setOpaque(false);
+        JLabel lbl = new JLabel("<html><div style='width:240px'>" + descripcion + "</div></html>");
+        lbl.setForeground(new Color(90, 100, 120));
+        cuerpo.add(lbl, BorderLayout.CENTER);
+        JButton btn = new JButton(textoBoton);
+        UIStyles.stylePrimaryButton(btn);
+        UIStyles.applySvgIcon(btn, icono, 16);
+        btn.addActionListener(e -> accion.run());
+        JPanel pie = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        pie.setOpaque(false);
+        pie.add(btn);
+        cuerpo.add(pie, BorderLayout.SOUTH);
+        return UIStyles.createCard(titulo, cuerpo);
     }
 
     private void cargarIconoApp() {
@@ -263,8 +471,8 @@ public class MainWindow extends JFrame {
             abrirConfiguracion();
         }
         configurarEmpleado();
-        // Cargar resultados automáticamente al iniciar
-        cargarPagina(1);
+        // Mostrar la primera página y cargar resultados al iniciar
+        mostrarPagina(PAG_PRESTAMO);
     }
     
     private void abrirConfiguracion() {
@@ -424,7 +632,8 @@ public class MainWindow extends JFrame {
         for (ItemCarrito item : carrito) {
             modeloCarrito.addRow(new Object[]{
                 item.getNombre(),
-                item.getCategoria(),
+                item.getProveedorNombre() != null ? item.getProveedorNombre() : "-",
+                item.getUnidad(),
                 item.getCantidad()
             });
         }
@@ -457,7 +666,7 @@ public class MainWindow extends JFrame {
     }
 
     private class ResultadosTableModel extends AbstractTableModel {
-        private final String[] columnas = {"ID", "Nombre", "Categoría", "Stock", "Cantidad", "Agregar"};
+        private final String[] columnas = {"ID", "Nombre", "Categoría", "Tipo", "Unidad", "Proveedor", "Stock", "Cantidad", "Agregar"};
         private List<Herramienta> datos = new ArrayList<>();
         private List<Integer> cantidades = new ArrayList<>();
 
@@ -510,10 +719,16 @@ public class MainWindow extends JFrame {
                 case 2:
                     return h.getCategoria();
                 case 3:
-                    return h.getStock();
+                    return h.getTipo();
                 case 4:
-                    return cantidades.get(rowIndex);
+                    return h.getUnidad();
                 case 5:
+                    return h.getProveedorNombre() != null ? h.getProveedorNombre() : "-";
+                case COL_STOCK:
+                    return h.getStock();
+                case COL_CANTIDAD:
+                    return cantidades.get(rowIndex);
+                case COL_AGREGAR:
                     return "+";
                 default:
                     return "";
@@ -522,12 +737,12 @@ public class MainWindow extends JFrame {
 
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
-            return columnIndex == 4 || columnIndex == 5;
+            return columnIndex == COL_CANTIDAD || columnIndex == COL_AGREGAR;
         }
 
         @Override
         public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-            if (columnIndex == 4) {
+            if (columnIndex == COL_CANTIDAD) {
                 int valor = 1;
                 if (aValue instanceof Number) {
                     valor = ((Number) aValue).intValue();
@@ -548,7 +763,7 @@ public class MainWindow extends JFrame {
 
         @Override
         public Class<?> getColumnClass(int columnIndex) {
-            if (columnIndex == 0 || columnIndex == 3 || columnIndex == 4) {
+            if (columnIndex == COL_ID || columnIndex == COL_STOCK || columnIndex == COL_CANTIDAD) {
                 return Integer.class;
             }
             return String.class;
@@ -645,32 +860,10 @@ public class MainWindow extends JFrame {
         }
     }
     
-    private void agregarHerramienta() {
-        AgregarHerramientaDialog dialog = new AgregarHerramientaDialog(this);
-        dialog.setVisible(true);
-        cargarPagina(1);
-    }
-    
     private void verPrestamos() {
         VerPrestamosDialog dialog = new VerPrestamosDialog(this);
         dialog.setVisible(true);
         // Refrescar cantidades al cerrar la ventana de préstamos
         cargarPagina(paginaActual);
-    }
-
-    private void verInventario() {
-        InventarioDialog dialog = new InventarioDialog(this);
-        dialog.setVisible(true);
-    }
-
-    private void verCategorias() {
-        CategoriasDialog dialog = new CategoriasDialog(this);
-        dialog.setVisible(true);
-    }
-    
-    private void registrarIngreso() {
-        RegistrarIngresoDialog dialog = new RegistrarIngresoDialog(this);
-        dialog.setVisible(true);
-        cargarPagina(paginaActual); // Refrescar búsqueda
     }
 }

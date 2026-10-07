@@ -12,14 +12,14 @@ public class RegistrarIngresoDialog extends JDialog {
     private JButton btnRegistrar;
     private JButton btnCancelar;
     
-    public RegistrarIngresoDialog(JFrame parent) {
-        super(parent, "Registrar Ingreso de Stock", true);
+    public RegistrarIngresoDialog(Window parent) {
+        super(parent, "Registrar Ingreso de Stock", ModalityType.APPLICATION_MODAL);
         initComponents();
         cargarHerramientas();
     }
     
     private void initComponents() {
-        setSize(500, 200);
+        setSize(640, 220);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
         getContentPane().setBackground(UIStyles.BG);
@@ -34,14 +34,14 @@ public class RegistrarIngresoDialog extends JDialog {
         // Herramienta
         gbc.gridx = 0;
         gbc.gridy = 0;
-        JLabel lblHerramienta = new JLabel("Herramienta:");
+        JLabel lblHerramienta = new JLabel("Material [proveedor]:");
         lblHerramienta.setForeground(UIStyles.TEXT);
         panelPrincipal.add(lblHerramienta, gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         comboHerramientas = new JComboBox<>();
-        comboHerramientas.setPreferredSize(new Dimension(300, 30));
+        comboHerramientas.setPreferredSize(new Dimension(420, 30));
         panelPrincipal.add(comboHerramientas, gbc);
         
         // Cantidad
