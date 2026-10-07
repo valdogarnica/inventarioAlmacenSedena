@@ -19,7 +19,7 @@ public class DatabaseManager {
     private DatabaseManager() {
         
     }
-    
+    //hola mundo
     public static DatabaseManager getInstance() {
         if (instance == null) {
             instance = new DatabaseManager();
