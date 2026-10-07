@@ -45,6 +45,7 @@ public class InventarioPanel extends JPanel implements Pagina {
         lblProveedor.setForeground(UIStyles.TEXT);
         filtros.add(lblProveedor);
         comboProveedor.setPreferredSize(new Dimension(230, 30));
+        ComboBuscable.instalar(comboProveedor);
         comboProveedor.addActionListener(e -> {
             if (!cargandoProveedores) {
                 cargarPagina(1);

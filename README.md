@@ -9,6 +9,7 @@ Sistema de gestión de inventario con préstamos de herramientas desarrollado en
 - ✅ Cada material pertenece a su proveedor: el mismo material de dos proveedores se guarda en dos registros, cada uno con su propio stock
 - ✅ Proveedores con sus materiales y sus remisiones
 - ✅ Catálogos administrables de Categorías, Tipos y Unidades (se eligen en combos y se pueden agregar desde los formularios)
+- ✅ Búsqueda en todas las listas desplegables: al abrir un combo aparece "Escriba para buscar…" y lo que se teclea filtra las opciones (sin importar mayúsculas ni acentos; Enter elige el resultado)
 - ✅ Sistema de préstamos con carrito, devoluciones parciales y fotos
 - ✅ Reportes PDF con fecha de generación, unidades y numeración de páginas
 - ✅ Configuración flexible de base de datos (selección de carpeta y base de datos)

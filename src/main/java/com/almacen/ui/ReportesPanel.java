@@ -87,6 +87,7 @@ public class ReportesPanel extends JPanel implements Pagina {
             () -> PdfViewer.generarYAbrir(this, ReportesPdf::prestamosActivos, "No hay préstamos activos para reportar")));
 
         comboHerramienta.setPreferredSize(new Dimension(260, 28));
+        ComboBuscable.instalar(comboHerramienta);
         grid.add(tarjeta("Reporte por herramienta",
             "Préstamos activos de una herramienta con fecha, unidad, categoría, cantidad, cliente y residente.",
             fila("Herramienta:", comboHerramienta),

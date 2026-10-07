@@ -499,6 +499,7 @@ public class VerPrestamosDialog extends JDialog {
             panelOpciones.add(new JLabel("Herramienta:"), gbc);
             gbc.gridx = 1;
             comboHerramientas.setPreferredSize(new Dimension(240, 28));
+            ComboBuscable.instalar(comboHerramientas);
             panelOpciones.add(comboHerramientas, gbc);
 
             comboHerramientas.setEnabled(false);

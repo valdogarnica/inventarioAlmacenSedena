@@ -42,6 +42,7 @@ public class RegistrarIngresoDialog extends JDialog {
         gbc.weightx = 1.0;
         comboHerramientas = new JComboBox<>();
         comboHerramientas.setPreferredSize(new Dimension(420, 30));
+        ComboBuscable.instalar(comboHerramientas);
         panelPrincipal.add(comboHerramientas, gbc);
         
         // Cantidad

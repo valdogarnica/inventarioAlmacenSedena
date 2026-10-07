@@ -18,6 +18,7 @@ public class CatalogoSelector extends JPanel {
         super(new BorderLayout(8, 0));
         this.catalogo = catalogo;
         setOpaque(false);
+        ComboBuscable.instalar(combo);
         add(combo, BorderLayout.CENTER);
         JButton btnNuevo = new JButton(catalogo == Catalogo.TIPOS ? "Nuevo" : "Nueva");
         btnNuevo.setToolTipText(catalogo.getEtiquetaNuevo());

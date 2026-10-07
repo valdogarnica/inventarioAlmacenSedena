@@ -102,6 +102,7 @@ public class ConfiguracionDBDialog extends JDialog {
         gbc.weightx = 1.0;
         comboBasesDatos = new JComboBox<>();
         comboBasesDatos.setPreferredSize(new Dimension(300, 30));
+        ComboBuscable.instalar(comboBasesDatos);
         panelPrincipal.add(comboBasesDatos, gbc);
         
         // Separador

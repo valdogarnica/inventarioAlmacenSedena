@@ -105,6 +105,7 @@ public class RegistrarRemisionDialog extends JDialog {
 
         comboMaterialEditor = new JComboBox<>();
         comboMaterialEditor.setEditable(true);
+        ComboBuscable.instalar(comboMaterialEditor);
         tabla.getColumnModel().getColumn(COL_MATERIAL).setCellEditor(new DefaultCellEditor(comboMaterialEditor));
         tabla.getColumnModel().getColumn(COL_UNIDAD).setCellEditor(crearEditorCatalogo(Catalogo.UNIDADES));
         tabla.getColumnModel().getColumn(COL_CATEGORIA).setCellEditor(crearEditorCatalogo(Catalogo.CATEGORIAS));
@@ -208,6 +209,7 @@ public class RegistrarRemisionDialog extends JDialog {
         } catch (Exception ignored) {
             // El combo queda editable aunque no se haya podido cargar
         }
+        ComboBuscable.instalar(combo);
         return new DefaultCellEditor(combo);
     }
 

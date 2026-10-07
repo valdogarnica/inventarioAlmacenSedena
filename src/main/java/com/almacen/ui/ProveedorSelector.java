@@ -27,6 +27,7 @@ public class ProveedorSelector extends JPanel {
         this.permiteNinguno = etiquetaNinguno != null;
         this.ninguno = new Proveedor(0, etiquetaNinguno != null ? etiquetaNinguno : "");
         setOpaque(false);
+        ComboBuscable.instalar(combo);
         add(combo, BorderLayout.CENTER);
         if (conBotonNuevo) {
             JButton btnNuevo = new JButton("Nuevo");
