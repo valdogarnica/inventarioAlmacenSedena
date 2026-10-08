@@ -35,8 +35,8 @@ public class ConfirmarPrestamoDialog extends JDialog {
     private DefaultTableModel modeloResumen;
     private JButton btnConfirmar;
     private JButton btnCancelar;
-    private List<ItemCarrito> items;
-    private String nombreEmpleado;
+    private final List<ItemCarrito> items;
+    private final String nombreEmpleado;
     private boolean prestamoConfirmado = false;
     
     public ConfirmarPrestamoDialog(JFrame parent, List<ItemCarrito> items, String nombreEmpleado) {
@@ -47,10 +47,9 @@ public class ConfirmarPrestamoDialog extends JDialog {
     }
     
     private void initComponents() {
-        setSize(980, 700);
+        setSize(1100, 700);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -69,7 +68,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         gbcCliente.gridx = 0;
         gbcCliente.gridy = 0;
         JLabel lblCliente = new JLabel("Nombre del Cliente:");
-        lblCliente.setForeground(UIStyles.TEXT);
         panelCliente.add(lblCliente, gbcCliente);
 
         gbcCliente.gridx = 1;
@@ -83,7 +81,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         gbcCliente.fill = GridBagConstraints.NONE;
         gbcCliente.weightx = 0;
         JLabel lblResidente = new JLabel("Residente o Sobrestante:");
-        lblResidente.setForeground(UIStyles.TEXT);
         panelCliente.add(lblResidente, gbcCliente);
 
         gbcCliente.gridx = 1;
@@ -97,7 +94,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         gbcCliente.fill = GridBagConstraints.NONE;
         gbcCliente.weightx = 0;
         JLabel lblAut = new JLabel("Autorización:");
-        lblAut.setForeground(UIStyles.TEXT);
         panelCliente.add(lblAut, gbcCliente);
 
         gbcCliente.gridx = 1;
@@ -110,7 +106,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         panelFolio = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         panelFolio.setOpaque(false);
         JLabel lblFolio = new JLabel("Folio:");
-        lblFolio.setForeground(UIStyles.TEXT);
         panelFolio.add(lblFolio);
         txtFolio = new JTextField(18);
         panelFolio.add(txtFolio);
@@ -130,7 +125,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         JPanel panelResumen = new JPanel(new BorderLayout());
         panelResumen.setOpaque(false);
         
-        String[] columnas = {"Nombre", "Categoría", "Cantidad"};
+        String[] columnas = {"Nombre", "Categoría", "Cantidad", "Devolución"};
         modeloResumen = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -139,19 +134,34 @@ public class ConfirmarPrestamoDialog extends JDialog {
         };
         tablaResumen = new JTable(modeloResumen);
         tablaResumen.getTableHeader().setReorderingAllowed(false);
-        tablaResumen.setRowHeight(28);
+        tablaResumen.setRowHeight(32);
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaResumen);
         DefaultTableCellRenderer centerRenderer = UIStyles.createCenteredNumberRenderer();
         tablaResumen.getColumnModel().getColumn(2).setCellRenderer(centerRenderer); // Cantidad
         
+        java.util.Set<String> noRetorno = new java.util.HashSet<>();
+        try {
+            noRetorno = DatabaseManager.getInstance().obtenerTiposNoRetorno();
+        } catch (Exception ignored) {
+            // Sin la lista se muestran todos como de retorno; al guardar se usa la base
+        }
         for (ItemCarrito item : items) {
+            String tipo = item.getHerramienta().getTipo();
+            boolean sinRetorno = tipo != null && noRetorno.contains(tipo.trim().toLowerCase());
             modeloResumen.addRow(new Object[]{
                 item.getNombre(),
                 item.getCategoria(),
-                item.getCantidad()
+                item.getCantidad(),
+                sinRetorno ? "No retorno" : "Se devuelve"
             });
         }
+        tablaResumen.getColumnModel().getColumn(3).setCellRenderer(new InsigniaRenderer() {
+            @Override
+            protected Tono tono(JTable table, Object value, int row) {
+                return "No retorno".equals(value) ? Tono.AVISO : Tono.INFO;
+            }
+        });
         
         JScrollPane scrollResumen = new JScrollPane(tablaResumen);
         panelResumen.add(scrollResumen, BorderLayout.CENTER);
@@ -160,11 +170,9 @@ public class ConfirmarPrestamoDialog extends JDialog {
         JPanel panelInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelInfo.setOpaque(false);
         JLabel lblEmpleado = new JLabel("Empleado: " + nombreEmpleado);
-        lblEmpleado.setForeground(UIStyles.TEXT);
         panelInfo.add(lblEmpleado);
         JLabel lblFecha = new JLabel("Fecha: " + LocalDateTime.now().format(
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        lblFecha.setForeground(UIStyles.TEXT);
         panelInfo.add(lblFecha);
         panelResumen.add(panelInfo, BorderLayout.SOUTH);
         
@@ -176,7 +184,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         JPanel panelSelector = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelSelector.setOpaque(false);
         JLabel lblCamara = new JLabel("Cámara:");
-        lblCamara.setForeground(UIStyles.TEXT);
         panelSelector.add(lblCamara);
         comboCamaras = new JComboBox<>();
         panelSelector.add(comboCamaras);
@@ -189,9 +196,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         cameraContainer = new JPanel(new CardLayout());
         cameraContainer.setOpaque(false);
         JLabel lblSinCamara = new JLabel("Inicie la cámara para ver el video", SwingConstants.CENTER);
-        lblSinCamara.setForeground(UIStyles.TEXT);
         lblFotoCapturada = new JLabel("Sin foto", SwingConstants.CENTER);
-        lblFotoCapturada.setForeground(UIStyles.TEXT);
         cameraContainer.add(lblSinCamara, "preview");
         cameraContainer.add(lblFotoCapturada, "foto");
         panelCamara.add(cameraContainer, BorderLayout.CENTER);
@@ -217,7 +222,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
         UIStyles.stylePrimaryButton(btnConfirmar);
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         panelBotones.add(btnCancelar);
         panelBotones.add(btnConfirmar);
         add(panelBotones, BorderLayout.SOUTH);
@@ -255,8 +260,8 @@ public class ConfirmarPrestamoDialog extends JDialog {
             
             // Verificar stocks antes de confirmar
             for (ItemCarrito item : items) {
-                com.almacen.model.Herramienta h = dbManager.obtenerHerramientaPorId(item.getIdHerramienta());
-                if (h == null || h.getStock() < item.getCantidad()) {
+                // El stock es la suma de todos los proveedores del material
+                if (dbManager.obtenerStockMaterial(item.getNombre(), item.getUnidad()) < item.getCantidad()) {
                     Notificaciones.showMessageDialog(this, 
                         "No hay suficiente stock para: " + item.getNombre(), 
                         "Error", JOptionPane.ERROR_MESSAGE);
@@ -299,8 +304,10 @@ public class ConfirmarPrestamoDialog extends JDialog {
 
             dbManager.crearPrestamoConDetalles(prestamo, items);
             
-            Notificaciones.showMessageDialog(this, 
-                "Préstamo realizado exitosamente", 
+            Notificaciones.showMessageDialog(this,
+                "ENTREGADO".equals(prestamo.getEstado())
+                    ? "Material entregado. Es de no retorno, así que el préstamo queda cerrado."
+                    : "Préstamo realizado exitosamente",
                 "Éxito", JOptionPane.INFORMATION_MESSAGE);
             
             prestamoConfirmado = true;

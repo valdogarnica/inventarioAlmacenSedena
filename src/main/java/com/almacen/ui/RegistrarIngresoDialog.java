@@ -12,17 +12,16 @@ public class RegistrarIngresoDialog extends JDialog {
     private JButton btnRegistrar;
     private JButton btnCancelar;
     
-    public RegistrarIngresoDialog(JFrame parent) {
-        super(parent, "Registrar Ingreso de Stock", true);
+    public RegistrarIngresoDialog(Window parent) {
+        super(parent, "Registrar Ingreso de Stock", ModalityType.APPLICATION_MODAL);
         initComponents();
         cargarHerramientas();
     }
     
     private void initComponents() {
-        setSize(500, 200);
+        setSize(640, 220);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
         
         JPanel panelPrincipal = new JPanel(new GridBagLayout());
         panelPrincipal.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
@@ -34,14 +33,14 @@ public class RegistrarIngresoDialog extends JDialog {
         // Herramienta
         gbc.gridx = 0;
         gbc.gridy = 0;
-        JLabel lblHerramienta = new JLabel("Herramienta:");
-        lblHerramienta.setForeground(UIStyles.TEXT);
+        JLabel lblHerramienta = new JLabel("Material [proveedor]:");
         panelPrincipal.add(lblHerramienta, gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         comboHerramientas = new JComboBox<>();
-        comboHerramientas.setPreferredSize(new Dimension(300, 30));
+        comboHerramientas.setPreferredSize(new Dimension(420, 30));
+        ComboBuscable.instalar(comboHerramientas);
         panelPrincipal.add(comboHerramientas, gbc);
         
         // Cantidad
@@ -50,7 +49,6 @@ public class RegistrarIngresoDialog extends JDialog {
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
         JLabel lblCantidad = new JLabel("Cantidad a agregar:");
-        lblCantidad.setForeground(UIStyles.TEXT);
         panelPrincipal.add(lblCantidad, gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -68,7 +66,7 @@ public class RegistrarIngresoDialog extends JDialog {
         btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
         UIStyles.stylePrimaryButton(btnRegistrar);
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         panelBotones.add(btnCancelar);
         panelBotones.add(btnRegistrar);
         add(panelBotones, BorderLayout.SOUTH);

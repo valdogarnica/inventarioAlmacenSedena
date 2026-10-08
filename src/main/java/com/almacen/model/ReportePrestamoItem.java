@@ -9,6 +9,9 @@ public class ReportePrestamoItem {
     private String nombreHerramienta;
     private String categoria;
     private int cantidad;
+    private String unidad;
+    private String tipo;
+    private String proveedor;
 
     public String getNombreCliente() {
         return nombreCliente;
@@ -56,5 +59,29 @@ public class ReportePrestamoItem {
 
     public void setCantidad(int cantidad) {
         this.cantidad = cantidad;
+    }
+
+    public String getUnidad() {
+        return unidad;
+    }
+
+    public void setUnidad(String unidad) {
+        this.unidad = unidad;
+    }
+
+    public String getTipo() {
+        return tipo;
+    }
+
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
+
+    public String getProveedor() {
+        return proveedor;
+    }
+
+    public void setProveedor(String proveedor) {
+        this.proveedor = proveedor;
     }
 }

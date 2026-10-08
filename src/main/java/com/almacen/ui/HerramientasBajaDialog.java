@@ -30,15 +30,13 @@ public class HerramientasBajaDialog extends JDialog {
     }
 
     private void initComponents() {
-        setSize(1000, 600);
+        setSize(1100, 600);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel panelFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelFiltro.setOpaque(false);
         JLabel lblFiltro = new JLabel("Filtro:");
-        lblFiltro.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblFiltro);
         txtFiltro = new JTextField(25);
         txtFiltro.addActionListener(e -> cargarPagina(1));
@@ -56,19 +54,19 @@ public class HerramientasBajaDialog extends JDialog {
         panelFiltro.add(btnLimpiar);
         add(panelFiltro, BorderLayout.NORTH);
 
-        String[] columnas = {"ID", "Nombre", "Categoría", "Stock", "Descripción", "Dar de alta"};
+        String[] columnas = {"ID", "Nombre", "Categoría", "Unidad", "Proveedor", "Stock", "Descripción", "Dar de alta"};
         modelo = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 5;
+                return column == 7;
             }
         };
         tabla = new JTable(modelo);
         tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tabla.getTableHeader().setReorderingAllowed(false);
-        tabla.setRowHeight(28);
-        tabla.getColumnModel().getColumn(5).setCellRenderer(new AltaRenderer());
-        tabla.getColumnModel().getColumn(5).setCellEditor(new AltaEditor());
+        tabla.setRowHeight(32);
+        tabla.getColumnModel().getColumn(7).setCellRenderer(new AltaRenderer());
+        tabla.getColumnModel().getColumn(7).setCellEditor(new AltaEditor());
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tabla);
         aplicarCentradoNumeros();
@@ -78,7 +76,6 @@ public class HerramientasBajaDialog extends JDialog {
         JPanel panelControles = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelControles.setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
-        lblTamano.setForeground(UIStyles.TEXT);
         panelControles.add(lblTamano);
         comboTamanoPagina = new JComboBox<>(new Integer[]{10, 20, 50});
         comboTamanoPagina.setSelectedItem(10);
@@ -93,7 +90,6 @@ public class HerramientasBajaDialog extends JDialog {
         UIStyles.styleSecondaryButton(btnSiguiente);
         panelControles.add(btnSiguiente);
         lblPagina = new JLabel("Página 1 de 1");
-        lblPagina.setForeground(UIStyles.TEXT);
         panelControles.add(lblPagina);
 
         add(panelControles, BorderLayout.SOUTH);
@@ -124,6 +120,8 @@ public class HerramientasBajaDialog extends JDialog {
                     h.getId(),
                     h.getNombre(),
                     h.getCategoria(),
+                    h.getUnidad(),
+                    h.getProveedorNombre() != null ? h.getProveedorNombre() : "-",
                     h.getStock(),
                     h.getDescripcion(),
                     "Dar de alta"
@@ -142,7 +140,7 @@ public class HerramientasBajaDialog extends JDialog {
     private void aplicarCentradoNumeros() {
         DefaultTableCellRenderer center = UIStyles.createCenteredNumberRenderer();
         tabla.getColumnModel().getColumn(0).setCellRenderer(center); // ID
-        tabla.getColumnModel().getColumn(3).setCellRenderer(center); // Stock
+        tabla.getColumnModel().getColumn(5).setCellRenderer(center); // Stock
     }
 
     private class AltaRenderer extends JButton implements TableCellRenderer {
@@ -181,18 +179,14 @@ public class HerramientasBajaDialog extends JDialog {
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
             this.row = row;
-            return button;
+            return Tema.alDia(button);
         }
     }
 
     private void darDeAlta(int row) {
         int id = (Integer) modelo.getValueAt(row, 0);
-        int respuesta = JOptionPane.showConfirmDialog(this,
-            "¿Desea dar de alta esta herramienta?",
-            "Confirmar",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE);
-        if (respuesta != JOptionPane.YES_OPTION) {
+        if (!Alerta.confirmar(this, "La herramienta volverá a aparecer en el inventario.",
+                "¿Dar de alta esta herramienta?", Alerta.Tipo.PREGUNTA, "Dar de alta", "Cancelar")) {
             return;
         }
         new SwingWorker<Void, Void>() {

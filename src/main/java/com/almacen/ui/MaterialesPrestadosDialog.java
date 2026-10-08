@@ -26,15 +26,13 @@ public class MaterialesPrestadosDialog extends JDialog {
     }
 
     private void initComponents() {
-        setSize(1000, 650);
+        setSize(1150, 650);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel panelFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelFiltro.setOpaque(false);
         JLabel lblFiltro = new JLabel("Material:");
-        lblFiltro.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblFiltro);
         comboModel = new DefaultComboBoxModel<>();
         comboMaterial = new JComboBox<>(comboModel);
@@ -61,7 +59,7 @@ public class MaterialesPrestadosDialog extends JDialog {
         panelFiltro.add(btnLimpiar);
         add(panelFiltro, BorderLayout.NORTH);
 
-        String[] columnas = {"Material", "Categoría", "Cantidad", "Cliente", "Residente/Sobrestante", "Fecha préstamo"};
+        String[] columnas = {"Material", "Categoría", "Proveedor", "Unidad", "Cantidad", "Cliente", "Residente/Sobrestante", "Fecha préstamo"};
         modelo = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -69,17 +67,17 @@ public class MaterialesPrestadosDialog extends JDialog {
             }
         };
         tabla = new JTable(modelo);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         tabla.getTableHeader().setReorderingAllowed(false);
         UIStyles.styleTableHeader(tabla);
         DefaultTableCellRenderer center = UIStyles.createCenteredNumberRenderer();
-        tabla.getColumnModel().getColumn(2).setCellRenderer(center);
+        tabla.getColumnModel().getColumn(4).setCellRenderer(center);
         JScrollPane scroll = new JScrollPane(tabla);
         add(UIStyles.createCard("Materiales prestados", scroll), BorderLayout.CENTER);
 
         JButton btnCerrar = new JButton("Cerrar");
         btnCerrar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCerrar);
+        UIStyles.styleSecondaryButton(btnCerrar);
         JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelBotones.setOpaque(false);
         panelBotones.add(btnCerrar);
@@ -107,6 +105,8 @@ public class MaterialesPrestadosDialog extends JDialog {
                 modelo.addRow(new Object[]{
                     item.getNombreHerramienta(),
                     item.getCategoria(),
+                    item.getProveedor() != null ? item.getProveedor() : "-",
+                    item.getUnidad(),
                     item.getCantidad(),
                     item.getNombreCliente(),
                     item.getResidenteSobrestante(),
