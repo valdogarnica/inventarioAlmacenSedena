@@ -23,6 +23,11 @@ public class Main {
             UIManager.put("Table.selectionForeground", java.awt.Color.WHITE);
             UIManager.put("Panel.background", new java.awt.Color(245, 247, 251));
             UIManager.put("Button.cursor", Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            // Botones de los cuadros de diálogo en español aunque Windows esté en otro idioma
+            UIManager.put("OptionPane.okButtonText", "Aceptar");
+            UIManager.put("OptionPane.cancelButtonText", "Cancelar");
+            UIManager.put("OptionPane.yesButtonText", "Sí");
+            UIManager.put("OptionPane.noButtonText", "No");
         } catch (Exception e) {
             System.err.println("Error al configurar FlatLaf: " + e.getMessage());
         }

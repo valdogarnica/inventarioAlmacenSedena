@@ -22,6 +22,7 @@ public class MainWindow extends JFrame {
     private JTable tablaHerramientas;
     private ResultadosTableModel modeloTabla;
     private JTable tablaCarrito;
+    private static final int COL_CARRITO_CANTIDAD = 3;
     private DefaultTableModel modeloCarrito;
     private JButton btnQuitarCarrito;
     private JButton btnLimpiarCarrito;
@@ -326,11 +327,24 @@ public class MainWindow extends JFrame {
         JPanel panelDerecho = new JPanel(new BorderLayout(12, 12));
         panelDerecho.setOpaque(false);
         
-        String[] columnasCarrito = {"Nombre", "Proveedor", "Unidad", "Cantidad"};
+        String[] columnasCarrito = {"Nombre", "Proveedor", "Unidad", "Cantidad", "Stock"};
         modeloCarrito = new DefaultTableModel(columnasCarrito, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false;
+                return column == COL_CARRITO_CANTIDAD;
+            }
+
+            @Override
+            public void setValueAt(Object aValue, int row, int column) {
+                if (column == COL_CARRITO_CANTIDAD && row < carrito.size()) {
+                    // La cantidad se puede bajar o subir sin pasar del stock del material
+                    ItemCarrito item = carrito.get(row);
+                    int cantidad = aValue instanceof Number ? ((Number) aValue).intValue() : item.getCantidad();
+                    int stock = item.getHerramienta().getStock();
+                    item.setCantidad(Math.max(1, Math.min(stock, cantidad)));
+                    aValue = item.getCantidad();
+                }
+                super.setValueAt(aValue, row, column);
             }
         };
         tablaCarrito = new JTable(modeloCarrito);
@@ -340,7 +354,12 @@ public class MainWindow extends JFrame {
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaCarrito);
         DefaultTableCellRenderer centerRendererCarrito = UIStyles.createCenteredNumberRenderer();
-        tablaCarrito.getColumnModel().getColumn(3).setCellRenderer(centerRendererCarrito); // Cantidad
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setCellRenderer(new CantidadSpinnerRenderer());
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setCellEditor(new CantidadCarritoEditor());
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setPreferredWidth(90);
+        tablaCarrito.getColumnModel().getColumn(4).setCellRenderer(centerRendererCarrito);
+        tablaCarrito.getColumnModel().getColumn(4).setPreferredWidth(55);
+        tablaCarrito.setToolTipText("Cambie la cantidad con las flechas; no puede pasar del stock del material");
         JScrollPane scrollCarrito = new JScrollPane(tablaCarrito);
         JPanel cardCarrito = UIStyles.createCard("Herramientas seleccionadas", scrollCarrito);
         
@@ -349,9 +368,11 @@ public class MainWindow extends JFrame {
         panelBotonesCarrito.setOpaque(false);
         JPanel panelBotonesSecundarios = new JPanel(new GridLayout(1, 2, 8, 0));
         panelBotonesSecundarios.setOpaque(false);
-        btnQuitarCarrito = new JButton("Quitar del Carrito");
+        btnQuitarCarrito = new JButton("Quitar");
+        btnQuitarCarrito.setToolTipText("Quita una cantidad o todo el material seleccionado");
         btnQuitarCarrito.addActionListener(e -> quitarDelCarrito());
-        btnLimpiarCarrito = new JButton("Limpiar Carrito");
+        btnLimpiarCarrito = new JButton("Vaciar");
+        btnLimpiarCarrito.setToolTipText("Quita todo del carrito");
         btnLimpiarCarrito.addActionListener(e -> limpiarCarrito());
         btnRealizarPrestamo = new JButton("Realizar Préstamo");
         btnRealizarPrestamo.addActionListener(e -> realizarPrestamo());
@@ -417,7 +438,7 @@ public class MainWindow extends JFrame {
         JPanel grid = new JPanel(new GridLayout(1, 3, 14, 14));
         grid.setOpaque(false);
         grid.add(tarjetaAccion("Base de datos",
-            "Elegir la carpeta y la base de datos SQLite, y la carpeta de fotos.",
+            "Elegir la carpeta donde se guarda toda la información y la base de datos. Cada base tiene su carpeta de fotos.",
             "Configurar", "/icons/edit.svg", () -> {
                 abrirConfiguracion();
                 mostrarPagina(paginaVisible);
@@ -610,6 +631,36 @@ public class MainWindow extends JFrame {
             return;
         }
         
+        if (tablaCarrito.isEditing()) {
+            tablaCarrito.getCellEditor().stopCellEditing();
+        }
+        ItemCarrito item = carrito.get(filaSeleccionada);
+        if (item.getCantidad() > 1) {
+            // Quitar solo una parte de la cantidad
+            JSpinner spinner = new JSpinner(new SpinnerNumberModel(1, 1, item.getCantidad(), 1));
+            JPanel panel = new JPanel(new BorderLayout(6, 6));
+            panel.add(new JLabel("<html>¿Cuántas piezas de <b>" + item.getNombre() + "</b> quiere quitar?<br>"
+                + "En el carrito hay " + item.getCantidad() + " " + (item.getUnidad() != null ? item.getUnidad() : "")
+                + ".</html>"), BorderLayout.NORTH);
+            panel.add(spinner, BorderLayout.CENTER);
+            int r = JOptionPane.showConfirmDialog(this, panel, "Quitar del carrito",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+            if (r != JOptionPane.OK_OPTION) {
+                return;
+            }
+            try {
+                spinner.commitEdit();
+            } catch (java.text.ParseException ignored) {
+                // Se usa el último valor válido
+            }
+            int quitar = (Integer) spinner.getValue();
+            if (quitar < item.getCantidad()) {
+                item.setCantidad(item.getCantidad() - quitar);
+                actualizarTablaCarrito();
+                tablaCarrito.setRowSelectionInterval(filaSeleccionada, filaSeleccionada);
+                return;
+            }
+        }
         carrito.remove(filaSeleccionada);
         actualizarTablaCarrito();
     }
@@ -634,7 +685,8 @@ public class MainWindow extends JFrame {
                 item.getNombre(),
                 item.getProveedorNombre() != null ? item.getProveedorNombre() : "-",
                 item.getUnidad(),
-                item.getCantidad()
+                item.getCantidad(),
+                item.getHerramienta().getStock()
             });
         }
     }
@@ -834,6 +886,29 @@ public class MainWindow extends JFrame {
                 }
             }
             spinner.setValue(Math.max(1, actual));
+            return spinner;
+        }
+    }
+
+    /** Editor de la cantidad en el carrito: de 1 al stock del material. */
+    private class CantidadCarritoEditor extends AbstractCellEditor implements TableCellEditor {
+        private final JSpinner spinner = new JSpinner(new SpinnerNumberModel(1, 1, 9999, 1));
+
+        @Override
+        public Object getCellEditorValue() {
+            try {
+                spinner.commitEdit();
+            } catch (java.text.ParseException ignored) {
+                // Se usa el último valor válido
+            }
+            return spinner.getValue();
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+            int max = row < carrito.size() ? Math.max(1, carrito.get(row).getHerramienta().getStock()) : 9999;
+            int actual = value instanceof Number ? ((Number) value).intValue() : 1;
+            spinner.setModel(new SpinnerNumberModel(Math.max(1, Math.min(actual, max)), 1, max, 1));
             return spinner;
         }
     }

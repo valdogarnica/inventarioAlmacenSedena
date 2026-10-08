@@ -109,7 +109,8 @@ public class ProveedoresPanel extends JPanel implements Pagina {
                 int fila = tablaRemisiones.rowAtPoint(e.getPoint());
                 if (e.getClickCount() == 2 && fila >= 0) {
                     int id = (Integer) modeloRemisiones.getValueAt(tablaRemisiones.convertRowIndexToModel(fila), 0);
-                    new RemisionDetalleDialog(SwingUtilities.getWindowAncestor(ProveedoresPanel.this), id).setVisible(true);
+                    new RegistrarRemisionDialog(SwingUtilities.getWindowAncestor(ProveedoresPanel.this), id).setVisible(true);
+                    alMostrar();
                 }
             }
         });

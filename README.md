@@ -33,9 +33,11 @@ Sistema de gestión de inventario con préstamos de herramientas desarrollado en
 
 1. Ejecutar la aplicación
 2. Se abrirá automáticamente el diálogo de configuración de base de datos
-3. Seleccionar la carpeta donde se almacenarán las bases de datos
+3. Seleccionar la carpeta donde se guardará toda la información (solo se configura una vez)
 4. Crear una nueva base de datos o seleccionar una existente
 5. Hacer clic en "Conectar"
+
+Cada base de datos tiene su propia carpeta de fotos dentro de esa carpeta, con el mismo nombre seguido de "Fotos" (por ejemplo `inventario.db` → `inventarioFotos`). Se crea automáticamente al crear o elegir la base. Las fotos tomadas antes de este cambio se siguen encontrando en la carpeta de fotos que estaba configurada.
 
 ### Configurar Empleado
 
@@ -67,6 +69,8 @@ Sistema de gestión de inventario con préstamos de herramientas desarrollado en
 2. Elegir el proveedor (o registrarlo con **Nuevo**), capturar el número de remisión si la hoja lo trae, obra, quién envía, quién recibe y la fecha
 3. Capturar cada elemento con su cantidad y unidad (categoría, tipo y descripción son opcionales). Al escribir un material que el proveedor ya tiene, la columna *Estado* indica "Existente" y muestra cómo quedará el stock; si no, se creará como material nuevo de ese proveedor
 4. **Guardar remisión**. Se puede abrir el comprobante en PDF
+
+Para corregir una remisión: **Ver / editar** en la lista, marcar **Habilitar edición**, cambiar datos o materiales (agregar, quitar o cambiar cantidades) y **Guardar cambios**. El stock se ajusta a la diferencia; si se quiere quitar más de lo que hay en existencia (porque ya está prestado), no se guarda y se indica qué material falta.
 
 Ejemplo: si llega *material1* × 5 de *proveedor1* y después *material1* × 10 de *proveedor2*, el inventario muestra dos registros: *material1 [proveedor1]* con 5 y *material1 [proveedor2]* con 10. Una nueva remisión de *proveedor1* con *material1* × 3 deja ese registro en 8.
 

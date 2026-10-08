@@ -333,7 +333,7 @@ public class VerPrestamosDevueltosDialog extends JDialog {
                     "Información", JOptionPane.INFORMATION_MESSAGE);
                 return;
             }
-            File archivo = new File(rutaFotos, fotoNombre);
+            File archivo = AppPreferences.archivoFoto(fotoNombre);
             if (!archivo.exists()) {
                 Notificaciones.showMessageDialog(this,
                     "No se encontró la foto: " + archivo.getAbsolutePath(),

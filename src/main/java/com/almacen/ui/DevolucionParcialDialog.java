@@ -216,7 +216,7 @@ public class DevolucionParcialDialog extends JDialog {
                 return;
             }
             
-            File archivoFoto = new File(rutaFotos, prestamo.getFotoNombre());
+            File archivoFoto = AppPreferences.archivoFoto(prestamo.getFotoNombre());
             if (!archivoFoto.exists()) {
                 lblFoto.setText("Foto no encontrada");
                 lblFoto.setIcon(null);

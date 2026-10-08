@@ -8,94 +8,73 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
+/**
+ * Configuración de la base de datos. El usuario elige una sola carpeta donde se guarda
+ * toda la información: ahí están las bases de datos y, por cada una, su carpeta de fotos
+ * con el mismo nombre (inventario.db → inventarioFotos), que se crea automáticamente.
+ */
 public class ConfiguracionDBDialog extends JDialog {
+    private static final String SIN_BASES = "No hay bases de datos disponibles";
+
     private JTextField txtRutaCarpeta;
-    private JTextField txtRutaFotos;
     private JComboBox<String> comboBasesDatos;
-    private JButton btnSeleccionarCarpeta;
-    private JButton btnSeleccionarFotos;
-    private JButton btnConectar;
-    private JButton btnCrearBaseDatos;
+    private JLabel lblFotos;
     private JTextField txtNombreNuevaBD;
     private boolean conectado = false;
-    
+
     public ConfiguracionDBDialog(JFrame parent) {
         super(parent, "Configuración de Base de Datos", true);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         initComponents();
         cargarRutaGuardada();
     }
-    
+
     private void initComponents() {
         setLayout(new BorderLayout(10, 10));
-        setSize(600, 400);
+        setSize(760, 440);
         setLocationRelativeTo(null);
         getContentPane().setBackground(UIStyles.BG);
-        
-        // Panel principal
+
         JPanel panelPrincipal = new JPanel(new GridBagLayout());
-        panelPrincipal.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        panelPrincipal.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
         panelPrincipal.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.insets = new Insets(8, 8, 8, 8);
         gbc.anchor = GridBagConstraints.WEST;
-        
-        // Ruta de carpeta
+
+        JLabel ayuda = new JLabel("<html><div style='width:470px'>Seleccione una carpeta donde se guardará toda la "
+            + "información. Ahí se guardan las bases de datos y, por cada una, su carpeta de fotos "
+            + "(por ejemplo <b>inventario.db</b> usa <b>inventarioFotos</b>), que se crea automáticamente.</div></html>");
+        ayuda.setForeground(new Color(90, 100, 120));
         gbc.gridx = 0;
         gbc.gridy = 0;
-        JLabel lblCarpeta = new JLabel("Carpeta de Bases de Datos:");
-        lblCarpeta.setForeground(UIStyles.TEXT);
-        panelPrincipal.add(lblCarpeta, gbc);
-        
+        gbc.gridwidth = 3;
+        panelPrincipal.add(ayuda, gbc);
+
+        // Carpeta global
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        panelPrincipal.add(etiqueta("Carpeta de información:"), gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         txtRutaCarpeta = new JTextField(30);
         txtRutaCarpeta.setEditable(false);
         panelPrincipal.add(txtRutaCarpeta, gbc);
-        
         gbc.gridx = 2;
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
-        btnSeleccionarCarpeta = new JButton("Seleccionar");
+        JButton btnSeleccionarCarpeta = new JButton("Seleccionar carpeta");
         btnSeleccionarCarpeta.addActionListener(e -> seleccionarCarpeta());
         UIStyles.styleSecondaryButton(btnSeleccionarCarpeta);
         panelPrincipal.add(btnSeleccionarCarpeta, gbc);
 
-        // Carpeta de fotos
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0;
-        JLabel lblFotos = new JLabel("Carpeta de Fotos:");
-        lblFotos.setForeground(UIStyles.TEXT);
-        panelPrincipal.add(lblFotos, gbc);
-
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0;
-        txtRutaFotos = new JTextField(30);
-        txtRutaFotos.setEditable(false);
-        panelPrincipal.add(txtRutaFotos, gbc);
-
-        gbc.gridx = 2;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0;
-        btnSeleccionarFotos = new JButton("Seleccionar");
-        btnSeleccionarFotos.addActionListener(e -> seleccionarCarpetaFotos());
-        UIStyles.styleSecondaryButton(btnSeleccionarFotos);
-        panelPrincipal.add(btnSeleccionarFotos, gbc);
-        
-        // ComboBox de bases de datos
+        // Base de datos
         gbc.gridx = 0;
         gbc.gridy = 2;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0;
-        JLabel lblBaseDatos = new JLabel("Base de Datos:");
-        lblBaseDatos.setForeground(UIStyles.TEXT);
-        panelPrincipal.add(lblBaseDatos, gbc);
-        
+        panelPrincipal.add(etiqueta("Base de datos:"), gbc);
         gbc.gridx = 1;
         gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -103,253 +82,242 @@ public class ConfiguracionDBDialog extends JDialog {
         comboBasesDatos = new JComboBox<>();
         comboBasesDatos.setPreferredSize(new Dimension(300, 30));
         ComboBuscable.instalar(comboBasesDatos);
+        comboBasesDatos.addActionListener(e -> actualizarCarpetaFotos());
         panelPrincipal.add(comboBasesDatos, gbc);
-        
-        // Separador
+
+        // Carpeta de fotos (calculada)
         gbc.gridx = 0;
         gbc.gridy = 3;
-        gbc.gridwidth = 3;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        panelPrincipal.add(new JSeparator(), gbc);
-        
-        // Crear nueva base de datos
-        gbc.gridx = 0;
-        gbc.gridy = 4;
         gbc.gridwidth = 1;
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
-        JLabel lblNueva = new JLabel("Crear Nueva BD:");
-        lblNueva.setForeground(UIStyles.TEXT);
-        panelPrincipal.add(lblNueva, gbc);
-        
+        panelPrincipal.add(etiqueta("Fotos de esta base:"), gbc);
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+        lblFotos = new JLabel("-");
+        lblFotos.setForeground(new Color(45, 108, 223));
+        panelPrincipal.add(lblFotos, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.gridwidth = 3;
+        panelPrincipal.add(new JSeparator(), gbc);
+
+        // Nueva base de datos
+        gbc.gridy = 5;
+        gbc.gridwidth = 1;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.weightx = 0;
+        panelPrincipal.add(etiqueta("Crear nueva base:"), gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         txtNombreNuevaBD = new JTextField();
-        txtNombreNuevaBD.setToolTipText("Ingrese el nombre de la nueva base de datos (sin extensión .db)");
+        txtNombreNuevaBD.putClientProperty("JTextField.placeholderText", "Nombre, por ejemplo: inventario");
+        txtNombreNuevaBD.setToolTipText("Nombre de la nueva base de datos (sin extensión .db)");
+        txtNombreNuevaBD.addActionListener(e -> crearBaseDatos());
         panelPrincipal.add(txtNombreNuevaBD, gbc);
-        
         gbc.gridx = 2;
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
-        btnCrearBaseDatos = new JButton("Crear");
+        JButton btnCrearBaseDatos = new JButton("Crear");
         btnCrearBaseDatos.addActionListener(e -> crearBaseDatos());
         UIStyles.styleSecondaryButton(btnCrearBaseDatos);
+        UIStyles.applySvgIcon(btnCrearBaseDatos, "/icons/add.svg", 16);
         panelPrincipal.add(btnCrearBaseDatos, gbc);
-        
-        // Botones
+
         JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelBotones.setOpaque(false);
-        btnConectar = new JButton("Conectar");
+        JButton btnConectar = new JButton("Conectar");
         btnConectar.addActionListener(e -> conectar());
         UIStyles.stylePrimaryButton(btnConectar);
         UIStyles.applySvgIcon(btnConectar, "/icons/enlace.svg", 16);
         panelBotones.add(btnConectar);
-        
         JButton btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
         UIStyles.styleDangerButton(btnCancelar);
         UIStyles.applySvgIcon(btnCancelar, "/icons/cancel.svg", 16);
         panelBotones.add(btnCancelar);
-        
-        JPanel card = UIStyles.createCard("Base de datos", panelPrincipal);
-        add(card, BorderLayout.CENTER);
+
+        add(UIStyles.createCard("Base de datos", panelPrincipal), BorderLayout.CENTER);
         add(panelBotones, BorderLayout.SOUTH);
     }
-    
+
+    private static JLabel etiqueta(String texto) {
+        JLabel lbl = new JLabel(texto);
+        lbl.setForeground(UIStyles.TEXT);
+        return lbl;
+    }
+
+    private File carpeta() {
+        String ruta = txtRutaCarpeta.getText().trim();
+        return ruta.isEmpty() ? null : new File(ruta);
+    }
+
+    private String baseSeleccionada() {
+        Object v = comboBasesDatos.getSelectedItem();
+        return v == null || SIN_BASES.equals(v) ? null : v.toString();
+    }
+
     private void seleccionarCarpeta() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        fileChooser.setDialogTitle("Seleccionar Carpeta de Bases de Datos");
-        
-        if (txtRutaCarpeta.getText().isEmpty()) {
-            fileChooser.setCurrentDirectory(FileSystemView.getFileSystemView().getHomeDirectory());
-        } else {
-            File currentDir = new File(txtRutaCarpeta.getText());
-            if (currentDir.exists()) {
-                fileChooser.setCurrentDirectory(currentDir);
-            }
-        }
-        
-        int result = fileChooser.showOpenDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedFolder = fileChooser.getSelectedFile();
-            txtRutaCarpeta.setText(selectedFolder.getAbsolutePath());
-            cargarBasesDatos(selectedFolder);
-            AppPreferences.setDbFolderPath(selectedFolder.getAbsolutePath());
+        fileChooser.setDialogTitle("Seleccione la carpeta donde se guardará toda la información");
+        File actual = carpeta();
+        fileChooser.setCurrentDirectory(actual != null && actual.exists()
+            ? actual : FileSystemView.getFileSystemView().getHomeDirectory());
+        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File seleccionada = fileChooser.getSelectedFile();
+            txtRutaCarpeta.setText(seleccionada.getAbsolutePath());
+            AppPreferences.setDbFolderPath(seleccionada.getAbsolutePath());
+            cargarBasesDatos(seleccionada, null);
         }
     }
 
-    private void seleccionarCarpetaFotos() {
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        fileChooser.setDialogTitle("Seleccionar Carpeta de Fotos");
-
-        if (txtRutaFotos.getText().isEmpty()) {
-            fileChooser.setCurrentDirectory(FileSystemView.getFileSystemView().getHomeDirectory());
-        } else {
-            File currentDir = new File(txtRutaFotos.getText());
-            if (currentDir.exists()) {
-                fileChooser.setCurrentDirectory(currentDir);
-            }
-        }
-
-        int result = fileChooser.showOpenDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedFolder = fileChooser.getSelectedFile();
-            txtRutaFotos.setText(selectedFolder.getAbsolutePath());
-            AppPreferences.setPhotoFolderPath(selectedFolder.getAbsolutePath());
-        }
-    }
-    
-    private void cargarBasesDatos(File carpeta) {
+    private void cargarBasesDatos(File carpeta, String seleccionar) {
         comboBasesDatos.removeAllItems();
-        
-        if (carpeta != null && carpeta.exists() && carpeta.isDirectory()) {
-            File[] archivos = carpeta.listFiles((dir, name) -> 
+        if (carpeta != null && carpeta.isDirectory()) {
+            File[] archivos = carpeta.listFiles((dir, name) ->
                 name.toLowerCase().endsWith(".db") || name.toLowerCase().endsWith(".sqlite"));
-            
             if (archivos != null) {
+                Arrays.sort(archivos, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
                 for (File archivo : archivos) {
                     comboBasesDatos.addItem(archivo.getName());
                 }
             }
         }
-        
         if (comboBasesDatos.getItemCount() == 0) {
-            comboBasesDatos.addItem("No hay bases de datos disponibles");
+            comboBasesDatos.addItem(SIN_BASES);
+        } else if (seleccionar != null) {
+            comboBasesDatos.setSelectedItem(seleccionar);
         }
+        actualizarCarpetaFotos();
     }
-    
+
+    /** Muestra (y crea) la carpeta de fotos de la base elegida. */
+    private void actualizarCarpetaFotos() {
+        File carpeta = carpeta();
+        String base = baseSeleccionada();
+        if (carpeta == null || base == null) {
+            lblFotos.setText("-");
+            return;
+        }
+        File fotos = AppPreferences.carpetaFotos(carpeta, base);
+        fotos.mkdirs();
+        lblFotos.setText(fotos.getAbsolutePath());
+        lblFotos.setToolTipText(fotos.getAbsolutePath());
+    }
+
     private void crearBaseDatos() {
         String nombreBD = txtNombreNuevaBD.getText().trim();
-        String rutaCarpeta = txtRutaCarpeta.getText().trim();
-        
+        File carpeta = carpeta();
+        if (carpeta == null) {
+            Notificaciones.showMessageDialog(this,
+                "Primero seleccione la carpeta donde se guardará la información",
+                "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         if (nombreBD.isEmpty()) {
-            Notificaciones.showMessageDialog(this, 
-                "Por favor ingrese un nombre para la base de datos", 
+            Notificaciones.showMessageDialog(this,
+                "Ingrese un nombre para la base de datos",
                 "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        
-        if (rutaCarpeta.isEmpty()) {
-            Notificaciones.showMessageDialog(this, 
-                "Por favor seleccione primero la carpeta de bases de datos", 
+        if (nombreBD.matches(".*[\\\\/:*?\"<>|].*")) {
+            Notificaciones.showMessageDialog(this,
+                "El nombre no puede llevar estos caracteres: \\ / : * ? \" < > |",
                 "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        
-        // Asegurar que el nombre tenga extensión .db
         if (!nombreBD.toLowerCase().endsWith(".db")) {
             nombreBD += ".db";
         }
-        
         try {
-            Path rutaCompleta = Paths.get(rutaCarpeta, nombreBD);
-            
-            // Verificar si ya existe
+            Path rutaCompleta = Paths.get(carpeta.getAbsolutePath(), nombreBD);
             if (Files.exists(rutaCompleta)) {
-                int respuesta = JOptionPane.showConfirmDialog(this,
-                    "La base de datos ya existe. ¿Desea reemplazarla?",
-                    "Confirmar", JOptionPane.YES_NO_OPTION);
-                if (respuesta != JOptionPane.YES_OPTION) {
-                    return;
-                }
+                Notificaciones.showMessageDialog(this,
+                    "Ya existe una base de datos con ese nombre; se seleccionó en la lista",
+                    "Información", JOptionPane.INFORMATION_MESSAGE);
+                cargarBasesDatos(carpeta, nombreBD);
+                return;
             }
-            
-            // Crear la base de datos
             DatabaseManager dbManager = DatabaseManager.getInstance();
             if (dbManager.connect(rutaCompleta.toString())) {
                 dbManager.disconnect();
-                Notificaciones.showMessageDialog(this, 
-                    "Base de datos creada exitosamente", 
-                    "Éxito", JOptionPane.INFORMATION_MESSAGE);
-                cargarBasesDatos(new File(rutaCarpeta));
+                File fotos = AppPreferences.carpetaFotos(carpeta, nombreBD);
+                fotos.mkdirs();
+                cargarBasesDatos(carpeta, nombreBD);
                 txtNombreNuevaBD.setText("");
+                Notificaciones.showMessageDialog(this,
+                    "Base de datos creada: " + nombreBD + "\nCarpeta de fotos: " + fotos.getName(),
+                    "Éxito", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                Notificaciones.showMessageDialog(this, 
-                    "Error al crear la base de datos", 
+                Notificaciones.showMessageDialog(this,
+                    "Error al crear la base de datos",
                     "Error", JOptionPane.ERROR_MESSAGE);
             }
         } catch (Exception e) {
-            Notificaciones.showMessageDialog(this, 
-                "Error: " + e.getMessage(), 
+            Notificaciones.showMessageDialog(this,
+                "Error: " + e.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
-    private void conectar() {
-        String rutaCarpeta = txtRutaCarpeta.getText().trim();
-        String rutaFotos = txtRutaFotos.getText().trim();
-        String nombreBD = (String) comboBasesDatos.getSelectedItem();
-        
-        if (rutaCarpeta.isEmpty()) {
-            Notificaciones.showMessageDialog(this, 
-                "Por favor seleccione la carpeta de bases de datos", 
-                "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        if (nombreBD == null || nombreBD.equals("No hay bases de datos disponibles")) {
-            Notificaciones.showMessageDialog(this, 
-                "Por favor seleccione una base de datos válida", 
-                "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
 
-        if (rutaFotos.isEmpty()) {
+    private void conectar() {
+        File carpeta = carpeta();
+        String nombreBD = baseSeleccionada();
+        if (carpeta == null) {
             Notificaciones.showMessageDialog(this,
-                "Por favor seleccione la carpeta de fotos",
+                "Seleccione la carpeta donde se guardará la información",
                 "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        
+        if (nombreBD == null) {
+            Notificaciones.showMessageDialog(this,
+                "Seleccione una base de datos o cree una nueva",
+                "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         try {
-            String rutaCompleta = Paths.get(rutaCarpeta, nombreBD).toString();
+            String rutaCompleta = new File(carpeta, nombreBD).getAbsolutePath();
             DatabaseManager dbManager = DatabaseManager.getInstance();
-            
             if (dbManager.connect(rutaCompleta)) {
                 conectado = true;
-                AppPreferences.setDbFolderPath(rutaCarpeta);
-                AppPreferences.setPhotoFolderPath(rutaFotos);
-                Notificaciones.showMessageDialog(this, 
-                    "Conexión exitosa a la base de datos", 
+                AppPreferences.usarBaseDatos(carpeta, nombreBD);
+                Notificaciones.showMessageDialog(this,
+                    "Conexión exitosa a " + nombreBD,
                     "Éxito", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             } else {
-                Notificaciones.showMessageDialog(this, 
-                    "Error al conectar con la base de datos", 
+                Notificaciones.showMessageDialog(this,
+                    "Error al conectar con la base de datos",
                     "Error", JOptionPane.ERROR_MESSAGE);
             }
         } catch (Exception e) {
-            Notificaciones.showMessageDialog(this, 
-                "Error: " + e.getMessage(), 
+            Notificaciones.showMessageDialog(this,
+                "Error: " + e.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
+
     private void cargarRutaGuardada() {
         try {
             String rutaGuardada = AppPreferences.getDbFolderPath();
             if (!rutaGuardada.isEmpty()) {
                 File carpeta = new File(rutaGuardada);
-                if (carpeta.exists() && carpeta.isDirectory()) {
+                if (carpeta.isDirectory()) {
                     txtRutaCarpeta.setText(rutaGuardada);
-                    cargarBasesDatos(carpeta);
-                }
-            }
-            String rutaFotos = AppPreferences.getPhotoFolderPath();
-            if (!rutaFotos.isEmpty()) {
-                File carpetaFotos = new File(rutaFotos);
-                if (carpetaFotos.exists() && carpetaFotos.isDirectory()) {
-                    txtRutaFotos.setText(rutaFotos);
+                    String ultima = AppPreferences.getUltimaBaseDatos();
+                    cargarBasesDatos(carpeta, ultima.isEmpty() ? null : ultima);
                 }
             }
         } catch (Exception e) {
             // Ignorar errores al cargar preferencias
         }
     }
-    
+
     public boolean isConectado() {
         return conectado;
     }

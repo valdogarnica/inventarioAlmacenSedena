@@ -55,7 +55,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
         add(norte, BorderLayout.NORTH);
 
         modelo = new DefaultTableModel(new String[]{"Folio", "No. remisión", "Fecha", "Proveedor", "Obra", "Envía",
-            "Recibió", "Partidas", "Cantidad total", "Detalle", "PDF"}, 0) {
+            "Recibió", "Partidas", "Cantidad total", "Ver / editar", "PDF"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return column == COL_VER || column == COL_PDF;
@@ -69,7 +69,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
         tabla.getColumnModel().getColumn(COL_ID).setCellRenderer(UIStyles.createCenteredNumberRenderer());
         tabla.getColumnModel().getColumn(7).setCellRenderer(UIStyles.createCenteredNumberRenderer());
         tabla.getColumnModel().getColumn(8).setCellRenderer(UIStyles.createCenteredNumberRenderer());
-        TablaBotones.instalar(tabla, COL_VER, "Ver", TablaBotones.Estilo.SECUNDARIO, this::verDetalle);
+        TablaBotones.instalar(tabla, COL_VER, "Ver / editar", TablaBotones.Estilo.SECUNDARIO, this::verDetalle);
         TablaBotones.instalar(tabla, COL_PDF, "PDF", TablaBotones.Estilo.SECUNDARIO, this::pdf);
         tabla.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
@@ -113,7 +113,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
                     r.getRecibe(),
                     r.getTotalPartidas(),
                     r.getTotalCantidad(),
-                    "Ver",
+                    "Ver / editar",
                     "PDF"
                 });
             }
@@ -133,7 +133,11 @@ public class RemisionesPanel extends JPanel implements Pagina {
 
     private void verDetalle(int fila) {
         int id = (Integer) modelo.getValueAt(fila, COL_ID);
-        new RemisionDetalleDialog(SwingUtilities.getWindowAncestor(this), id).setVisible(true);
+        RegistrarRemisionDialog dialog = new RegistrarRemisionDialog(SwingUtilities.getWindowAncestor(this), id);
+        dialog.setVisible(true);
+        if (dialog.isGuardado()) {
+            cargarPagina(paginador.getPaginaActual());
+        }
     }
 
     private void pdf(int fila) {

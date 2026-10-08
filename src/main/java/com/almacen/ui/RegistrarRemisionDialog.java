@@ -53,11 +53,36 @@ public class RegistrarRemisionDialog extends JDialog {
     private Map<String, List<Herramienta>> materialesTodos = new HashMap<>();
     private boolean guardado;
 
+    /** Remisión que se consulta o edita; null cuando es una remisión nueva. */
+    private Integer remisionId;
+    /** false mientras la remisión registrada solo se consulta (hasta marcar "Habilitar edición"). */
+    private boolean editable = true;
+    private JCheckBox chkEditar;
+    private JButton btnGuardar;
+    private JButton btnCancelar;
+    private final List<JComponent> controlesEdicion = new ArrayList<>();
+    /** Cantidades con que se registró la remisión, por material, para calcular el stock al editar. */
+    private Map<String, Integer> cantidadOriginal = new HashMap<>();
+    private int proveedorOriginal;
+
     public RegistrarRemisionDialog(Window parent, String empleado) {
         super(parent, "Registrar remisión de proveedor", ModalityType.APPLICATION_MODAL);
         this.empleado = empleado;
         initComponents();
         cargarMaterialesProveedor();
+    }
+
+    /**
+     * Consulta de una remisión registrada. Con la casilla "Habilitar edición" se pueden
+     * cambiar sus datos y sus materiales; al guardar se ajusta el stock.
+     */
+    public RegistrarRemisionDialog(Window parent, int remisionId) {
+        super(parent, "Remisión", ModalityType.APPLICATION_MODAL);
+        this.empleado = null;
+        this.remisionId = remisionId;
+        initComponents();
+        cargarRemision();
+        setEditable(false);
     }
 
     public boolean isGuardado() {
@@ -166,23 +191,135 @@ public class RegistrarRemisionDialog extends JDialog {
         sur.add(lblResumen, BorderLayout.WEST);
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         botones.setOpaque(false);
-        JButton btnCancelar = new JButton("Cancelar");
+        btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
         UIStyles.styleDangerButton(btnCancelar);
         UIStyles.applySvgIcon(btnCancelar, "/icons/cancel.svg", 16);
-        JButton btnGuardar = new JButton("Guardar remisión");
+        btnGuardar = new JButton("Guardar remisión");
         btnGuardar.addActionListener(e -> guardar());
         UIStyles.stylePrimaryButton(btnGuardar);
         UIStyles.applySvgIcon(btnGuardar, "/icons/save.svg", 16);
+        if (remisionId != null) {
+            chkEditar = new JCheckBox("Habilitar edición");
+            chkEditar.setOpaque(false);
+            chkEditar.setFont(chkEditar.getFont().deriveFont(Font.BOLD));
+            chkEditar.setToolTipText("Permite cambiar los datos y los materiales de esta remisión");
+            chkEditar.addActionListener(e -> alternarEdicion());
+            botones.add(chkEditar);
+            JButton btnPdf = new JButton("Comprobante PDF");
+            btnPdf.addActionListener(e -> PdfViewer.generarYAbrir(this, () -> ReportesPdf.remision(remisionId),
+                "No se encontró la remisión"));
+            UIStyles.styleSecondaryButton(btnPdf);
+            UIStyles.applySvgIcon(btnPdf, "/icons/report.svg", 16);
+            botones.add(btnPdf);
+            btnCancelar.setText("Cerrar");
+            btnGuardar.setText("Guardar cambios");
+        }
         botones.add(btnCancelar);
         botones.add(btnGuardar);
         sur.add(botones, BorderLayout.EAST);
         add(sur, BorderLayout.SOUTH);
 
-        for (int i = 0; i < 5; i++) {
-            modelo.agregarFila();
+        controlesEdicion.add(txtNumero);
+        controlesEdicion.add(txtObra);
+        controlesEdicion.add(txtEnvia);
+        controlesEdicion.add(txtRecibe);
+        controlesEdicion.add(txtObservaciones);
+        controlesEdicion.add(btnAgregarFila);
+        controlesEdicion.add(btnQuitarFila);
+        controlesEdicion.add(btnGuardar);
+
+        if (remisionId == null) {
+            for (int i = 0; i < 5; i++) {
+                modelo.agregarFila();
+            }
         }
         actualizarResumen();
+    }
+
+    // ------------------------------------------------------------------ consulta / edición
+
+    private void cargarRemision() {
+        try {
+            DatabaseManager db = DatabaseManager.getInstance();
+            Remision r = db.obtenerRemisionPorId(remisionId);
+            if (r == null) {
+                Notificaciones.showMessageDialog(this, "No se encontró la remisión", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            setTitle("Remisión " + (r.getNumeroRemision() != null ? r.getNumeroRemision() + " " : "")
+                + "(folio interno " + r.getId() + ")");
+            proveedorOriginal = r.getProveedorId();
+            selProveedor.recargar();
+            selProveedor.setSeleccion(r.getProveedorId());
+            txtNumero.setText(r.getNumeroRemision() != null ? r.getNumeroRemision() : "");
+            txtObra.setText(r.getObra() != null ? r.getObra() : "");
+            txtEnvia.setText(r.getEnvia() != null ? r.getEnvia() : "");
+            txtRecibe.setText(r.getRecibe() != null ? r.getRecibe() : "");
+            txtObservaciones.setText(r.getObservaciones() != null ? r.getObservaciones() : "");
+            dateFecha.setDate(r.getFecha() != null
+                ? Date.from(r.getFecha().atStartOfDay(ZoneId.systemDefault()).toInstant()) : null);
+            cantidadOriginal = new HashMap<>();
+            modelo.filas.clear();
+            for (DetalleRemision d : db.obtenerDetallesRemision(remisionId)) {
+                Partida p = new Partida();
+                p.material = d.getNombreMaterial();
+                p.cantidad = d.getCantidad();
+                p.unidad = d.getUnidad() != null ? d.getUnidad() : "";
+                p.categoria = d.getCategoria() != null ? d.getCategoria() : "";
+                p.tipo = d.getTipo() != null ? d.getTipo() : "";
+                p.descripcion = d.getDescripcion() != null ? d.getDescripcion() : "";
+                modelo.filas.add(p);
+                cantidadOriginal.merge(clave(d.getNombreMaterial()), d.getCantidad(), Integer::sum);
+            }
+            cargarMaterialesProveedor();
+        } catch (Exception e) {
+            Notificaciones.showMessageDialog(this, "Error al cargar la remisión: " + e.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void alternarEdicion() {
+        if (chkEditar.isSelected()) {
+            setEditable(true);
+            return;
+        }
+        detenerEdicion();
+        // Al desmarcar se descartan los cambios que no se guardaron
+        cargarRemision();
+        setEditable(false);
+    }
+
+    private void setEditable(boolean valor) {
+        editable = valor;
+        for (JComponent c : controlesEdicion) {
+            if (c instanceof JTextField) {
+                ((JTextField) c).setEditable(valor);
+            } else {
+                c.setEnabled(valor);
+            }
+        }
+        dateFecha.setEnabled(valor);
+        // JDateChooser no recupera el fondo normal al volver a habilitarse
+        dateFecha.getDateEditor().getUiComponent().setBackground(
+            UIManager.getColor(valor ? "TextField.background" : "TextField.disabledBackground"));
+        for (Component c : selProveedor.getComponents()) {
+            c.setEnabled(valor);
+        }
+        if (chkEditar != null && chkEditar.isSelected() != valor) {
+            chkEditar.setSelected(valor);
+        }
+        modelo.fireTableDataChanged();
+        actualizarResumen();
+    }
+
+    /** Cuánto de este material sumó la remisión al registrarse (solo cuenta si el proveedor no cambió). */
+    private int cantidadRegistrada(String material) {
+        Proveedor p = selProveedor.getSeleccion();
+        if (remisionId == null || p == null || p.getId() != proveedorOriginal) {
+            return 0;
+        }
+        return cantidadOriginal.getOrDefault(clave(material), 0);
     }
 
     private void agregarCampo(JPanel panel, GridBagConstraints gbc, int x, int y, String etiqueta, JComponent campo) {
@@ -340,7 +477,7 @@ public class RegistrarRemisionDialog extends JDialog {
         try {
             DatabaseManager db = DatabaseManager.getInstance();
             String numero = txtNumero.getText().trim();
-            if (db.existeRemision(numero, proveedor.getId())) {
+            if (remisionId == null && db.existeRemision(numero, proveedor.getId())) {
                 int r = JOptionPane.showConfirmDialog(this,
                     "Ya se registró la remisión \"" + numero + "\" de " + proveedor.getNombre() +
                         ".\n¿Desea registrarla de nuevo? Las cantidades se sumarán otra vez al stock.",
@@ -357,6 +494,17 @@ public class RegistrarRemisionDialog extends JDialog {
             remision.setRecibe(texto(txtRecibe.getText()));
             remision.setObservaciones(texto(txtObservaciones.getText()));
             remision.setFecha(fecha.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+            if (remisionId != null) {
+                remision.setId(remisionId);
+                db.actualizarRemision(remision, partidas);
+                guardado = true;
+                Notificaciones.showMessageDialog(this,
+                    "Remisión actualizada. El stock de sus materiales se ajustó a las nuevas cantidades.",
+                    "Remisión guardada", JOptionPane.INFORMATION_MESSAGE);
+                cargarRemision();
+                setEditable(false);
+                return;
+            }
             int id = db.registrarRemision(remision, partidas);
             guardado = true;
 
@@ -444,7 +592,7 @@ public class RegistrarRemisionDialog extends JDialog {
 
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
-            return columnIndex != COL_NUM && columnIndex != COL_ESTADO;
+            return editable && columnIndex != COL_NUM && columnIndex != COL_ESTADO;
         }
 
         @Override
@@ -469,12 +617,18 @@ public class RegistrarRemisionDialog extends JDialog {
                     if (p.material == null || p.material.trim().isEmpty()) {
                         return "";
                     }
+                    if (!editable) {
+                        return "Registrado";
+                    }
                     Herramienta h = materialesProveedor.get(clave(p.material));
-                    int cantidad = Math.max(0, p.cantidad);
+                    // Al editar, el stock actual ya incluye lo que sumó esta remisión
+                    int cantidad = Math.max(0, p.cantidad) - cantidadRegistrada(p.material);
                     int totalGeneral = stockTotal(p.material);
                     String total = " · total " + totalGeneral + " → " + (totalGeneral + cantidad);
                     if (h != null) {
-                        return "Existente (stock " + h.getStock() + " → " + (h.getStock() + cantidad) + ")" + total;
+                        int despues = h.getStock() + cantidad;
+                        return (despues < 0 ? "Sin existencia suficiente (stock " : "Existente (stock ")
+                            + h.getStock() + " → " + despues + ")" + total;
                     }
                     return materialesTodos.containsKey(clave(p.material))
                         ? "Nuevo para este proveedor" + total

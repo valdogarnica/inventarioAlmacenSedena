@@ -1765,66 +1765,149 @@ public class DatabaseManager {
                 }
             }
 
-            String sqlDet = "INSERT INTO detalle_remisiones (remision_id, herramienta_id, nombre_material, descripcion, " +
-                    "categoria, tipo, unidad, cantidad) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-            String sqlSumar = "UPDATE herramientas SET stock = stock + ?, estado = 1, remision = ?, " +
-                    "unidad = COALESCE(NULLIF(TRIM(unidad), ''), ?), tipo = COALESCE(NULLIF(TRIM(tipo), ''), ?) WHERE id = ?";
-            for (DetalleRemision partida : partidas) {
-                if (vacio(partida.getNombreMaterial()) || partida.getCantidad() <= 0) {
-                    throw new SQLException("Cada material debe tener nombre y una cantidad mayor a 0");
-                }
-                String categoria = vacio(partida.getCategoria()) ? "Sin categoría" : partida.getCategoria().trim();
-                partida.setCategoria(categoria);
-                Herramienta existente = buscarMaterialDeProveedor(partida.getNombreMaterial(), proveedor.getId());
-                int herramientaId;
-                if (existente != null) {
-                    herramientaId = existente.getId();
-                    try (PreparedStatement pstmt = connection.prepareStatement(sqlSumar)) {
-                        pstmt.setInt(1, partida.getCantidad());
-                        pstmt.setString(2, remision.getNumeroRemision());
-                        pstmt.setString(3, partida.getUnidad());
-                        pstmt.setString(4, partida.getTipo());
-                        pstmt.setInt(5, herramientaId);
-                        pstmt.executeUpdate();
-                    }
-                } else {
-                    Herramienta nueva = new Herramienta();
-                    nueva.setNombre(partida.getNombreMaterial().trim());
-                    nueva.setCategoria(categoria);
-                    nueva.setTipo(partida.getTipo());
-                    nueva.setUnidad(partida.getUnidad());
-                    nueva.setProveedorId(proveedor.getId());
-                    nueva.setProveedorNombre(proveedor.getNombre());
-                    nueva.setRemision(remision.getNumeroRemision());
-                    nueva.setStock(partida.getCantidad());
-                    nueva.setDescripcion(partida.getDescripcion());
-                    nueva.setEstado(1);
-                    herramientaId = agregarHerramienta(nueva);
-                }
-                partida.setHerramientaId(herramientaId);
-                partida.setRemisionId(remisionId);
-                try (PreparedStatement pstmt = connection.prepareStatement(sqlDet)) {
-                    pstmt.setInt(1, remisionId);
-                    pstmt.setInt(2, herramientaId);
-                    pstmt.setString(3, partida.getNombreMaterial().trim());
-                    pstmt.setString(4, partida.getDescripcion());
-                    pstmt.setString(5, categoria);
-                    pstmt.setString(6, partida.getTipo());
-                    pstmt.setString(7, partida.getUnidad());
-                    pstmt.setInt(8, partida.getCantidad());
-                    pstmt.executeUpdate();
-                }
-                agregarCatalogo(Catalogo.CATEGORIAS, categoria);
-                if (!vacio(partida.getTipo())) {
-                    agregarCatalogo(Catalogo.TIPOS, partida.getTipo());
-                }
-                if (!vacio(partida.getUnidad())) {
-                    agregarCatalogo(Catalogo.UNIDADES, partida.getUnidad());
-                }
-            }
+            aplicarPartidas(remisionId, remision, proveedor, partidas);
             connection.commit();
             remision.setId(remisionId);
             return remisionId;
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
+        } finally {
+            connection.setAutoCommit(true);
+        }
+    }
+
+    /** Suma cada partida al material del proveedor (o lo crea) y guarda el detalle de la remisión. */
+    private void aplicarPartidas(int remisionId, Remision remision, Proveedor proveedor,
+                                 List<DetalleRemision> partidas) throws SQLException {
+        String sqlDet = "INSERT INTO detalle_remisiones (remision_id, herramienta_id, nombre_material, descripcion, " +
+                "categoria, tipo, unidad, cantidad) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sqlSumar = "UPDATE herramientas SET stock = stock + ?, estado = 1, remision = ?, " +
+                "unidad = COALESCE(NULLIF(TRIM(unidad), ''), ?), tipo = COALESCE(NULLIF(TRIM(tipo), ''), ?) WHERE id = ?";
+        for (DetalleRemision partida : partidas) {
+            if (vacio(partida.getNombreMaterial()) || partida.getCantidad() <= 0) {
+                throw new SQLException("Cada material debe tener nombre y una cantidad mayor a 0");
+            }
+            String categoria = vacio(partida.getCategoria()) ? "Sin categoría" : partida.getCategoria().trim();
+            partida.setCategoria(categoria);
+            Herramienta existente = buscarMaterialDeProveedor(partida.getNombreMaterial(), proveedor.getId());
+            int herramientaId;
+            if (existente != null) {
+                herramientaId = existente.getId();
+                try (PreparedStatement pstmt = connection.prepareStatement(sqlSumar)) {
+                    pstmt.setInt(1, partida.getCantidad());
+                    pstmt.setString(2, remision.getNumeroRemision());
+                    pstmt.setString(3, partida.getUnidad());
+                    pstmt.setString(4, partida.getTipo());
+                    pstmt.setInt(5, herramientaId);
+                    pstmt.executeUpdate();
+                }
+            } else {
+                Herramienta nueva = new Herramienta();
+                nueva.setNombre(partida.getNombreMaterial().trim());
+                nueva.setCategoria(categoria);
+                nueva.setTipo(partida.getTipo());
+                nueva.setUnidad(partida.getUnidad());
+                nueva.setProveedorId(proveedor.getId());
+                nueva.setProveedorNombre(proveedor.getNombre());
+                nueva.setRemision(remision.getNumeroRemision());
+                nueva.setStock(partida.getCantidad());
+                nueva.setDescripcion(partida.getDescripcion());
+                nueva.setEstado(1);
+                herramientaId = agregarHerramienta(nueva);
+            }
+            partida.setHerramientaId(herramientaId);
+            partida.setRemisionId(remisionId);
+            try (PreparedStatement pstmt = connection.prepareStatement(sqlDet)) {
+                pstmt.setInt(1, remisionId);
+                pstmt.setInt(2, herramientaId);
+                pstmt.setString(3, partida.getNombreMaterial().trim());
+                pstmt.setString(4, partida.getDescripcion());
+                pstmt.setString(5, categoria);
+                pstmt.setString(6, partida.getTipo());
+                pstmt.setString(7, partida.getUnidad());
+                pstmt.setInt(8, partida.getCantidad());
+                pstmt.executeUpdate();
+            }
+            agregarCatalogo(Catalogo.CATEGORIAS, categoria);
+            if (!vacio(partida.getTipo())) {
+                agregarCatalogo(Catalogo.TIPOS, partida.getTipo());
+            }
+            if (!vacio(partida.getUnidad())) {
+                agregarCatalogo(Catalogo.UNIDADES, partida.getUnidad());
+            }
+        }
+    }
+
+    /**
+     * Modifica una remisión ya registrada (encabezado y partidas) y ajusta el stock:
+     * se quita lo que sumó la versión anterior y se suma lo nuevo, todo en una transacción.
+     * Si algún material quedara con stock negativo (porque esa cantidad ya está prestada
+     * o se usó), no se guarda nada y se explica el motivo.
+     */
+    public void actualizarRemision(Remision remision, List<DetalleRemision> partidas) throws SQLException {
+        if (partidas == null || partidas.isEmpty()) {
+            throw new SQLException("La remisión no tiene materiales");
+        }
+        Proveedor proveedor = obtenerProveedorPorId(remision.getProveedorId());
+        if (proveedor == null) {
+            throw new SQLException("El proveedor seleccionado no existe");
+        }
+        List<DetalleRemision> anteriores = obtenerDetallesRemision(remision.getId());
+        connection.setAutoCommit(false);
+        try {
+            java.util.Set<Integer> afectados = new java.util.LinkedHashSet<>();
+            try (PreparedStatement pstmt = connection.prepareStatement(
+                    "UPDATE herramientas SET stock = stock - ? WHERE id = ?")) {
+                for (DetalleRemision d : anteriores) {
+                    pstmt.setInt(1, d.getCantidad());
+                    pstmt.setInt(2, d.getHerramientaId());
+                    pstmt.executeUpdate();
+                    afectados.add(d.getHerramientaId());
+                }
+            }
+            try (PreparedStatement pstmt = connection.prepareStatement(
+                    "DELETE FROM detalle_remisiones WHERE remision_id = ?")) {
+                pstmt.setInt(1, remision.getId());
+                pstmt.executeUpdate();
+            }
+            String sqlRem = "UPDATE remisiones SET numero_remision = ?, proveedor_id = ?, obra = ?, envia = ?, " +
+                    "recibe = ?, fecha = ?, observaciones = ? WHERE id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sqlRem)) {
+                pstmt.setString(1, remision.getNumeroRemision());
+                pstmt.setInt(2, remision.getProveedorId());
+                pstmt.setString(3, remision.getObra());
+                pstmt.setString(4, remision.getEnvia());
+                pstmt.setString(5, remision.getRecibe());
+                pstmt.setString(6, (remision.getFecha() != null ? remision.getFecha() : LocalDate.now()).toString());
+                pstmt.setString(7, remision.getObservaciones());
+                pstmt.setInt(8, remision.getId());
+                if (pstmt.executeUpdate() == 0) {
+                    throw new SQLException("La remisión ya no existe");
+                }
+            }
+            aplicarPartidas(remision.getId(), remision, proveedor, partidas);
+            for (DetalleRemision d : partidas) {
+                afectados.add(d.getHerramientaId());
+            }
+            List<String> problemas = new ArrayList<>();
+            try (PreparedStatement pstmt = connection.prepareStatement(SELECT_HERRAMIENTA + "WHERE h.id = ?")) {
+                for (int id : afectados) {
+                    pstmt.setInt(1, id);
+                    for (Herramienta h : listarHerramientas(pstmt)) {
+                        if (h.getStock() < 0) {
+                            problemas.add("«" + h.getNombre() + "» (" +
+                                    (h.getProveedorNombre() != null ? h.getProveedorNombre() : "sin proveedor") +
+                                    "): faltan " + (-h.getStock()) + " en existencia");
+                        }
+                    }
+                }
+            }
+            if (!problemas.isEmpty()) {
+                throw new SQLException("No se puede quitar esa cantidad porque ya salió del almacén " +
+                        "(está prestada o se usó):\n" + String.join("\n", problemas));
+            }
+            connection.commit();
         } catch (SQLException e) {
             connection.rollback();
             throw e;
