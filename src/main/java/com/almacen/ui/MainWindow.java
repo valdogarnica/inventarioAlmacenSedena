@@ -534,6 +534,10 @@ public class MainWindow extends JFrame {
 
             @Override
             public void setValueAt(Object aValue, int row, int column) {
+                if (row >= getRowCount()) {
+                    // Edición de una fila que ya no existe (se vació o quitó el material)
+                    return;
+                }
                 if (column == COL_CARRITO_CANTIDAD && row < carrito.size()) {
                     // La cantidad se puede bajar o subir sin pasar del stock del material
                     ItemCarrito item = carrito.get(row);
@@ -784,6 +788,9 @@ public class MainWindow extends JFrame {
             
             // El mismo material de varios proveedores sale una vez, con el stock sumado
             List<Herramienta> herramientas = dbManager.buscarMaterialesPrestables(busqueda, offset, tamano);
+            if (tablaHerramientas.isEditing()) {
+                tablaHerramientas.getCellEditor().cancelCellEditing();
+            }
             modeloTabla.setDatos(herramientas);
             
             lblPagina.setText("Página " + paginaActual + " de " + totalPaginas + " (Total: " + totalRegistros + ")");
@@ -864,6 +871,7 @@ public class MainWindow extends JFrame {
     }
     
     private void quitarDelCarrito() {
+        terminarEdicionCarrito();
         int filaSeleccionada = tablaCarrito.getSelectedRow();
         if (filaSeleccionada == -1) {
             Notificaciones.showMessageDialog(this, 
@@ -906,6 +914,7 @@ public class MainWindow extends JFrame {
     }
 
     private void limpiarCarrito() {
+        terminarEdicionCarrito();
         if (carrito.isEmpty()) {
             return;
         }
@@ -916,7 +925,18 @@ public class MainWindow extends JFrame {
         }
     }
     
+    /** Guarda la cantidad que se está escribiendo en el carrito antes de usarlo. */
+    private void terminarEdicionCarrito() {
+        if (tablaCarrito.isEditing() && !tablaCarrito.getCellEditor().stopCellEditing()) {
+            tablaCarrito.getCellEditor().cancelCellEditing();
+        }
+    }
+
     private void actualizarTablaCarrito() {
+        // Sin esto el editor de cantidad se queda flotando sobre la tabla vacía
+        if (tablaCarrito.isEditing()) {
+            tablaCarrito.getCellEditor().cancelCellEditing();
+        }
         modeloCarrito.setRowCount(0);
         for (ItemCarrito item : carrito) {
             modeloCarrito.addRow(new Object[]{
@@ -929,6 +949,7 @@ public class MainWindow extends JFrame {
     }
     
     private void realizarPrestamo() {
+        terminarEdicionCarrito();
         if (carrito.isEmpty()) {
             Notificaciones.showMessageDialog(this, 
                 "El carrito está vacío", 
@@ -1094,7 +1115,7 @@ public class MainWindow extends JFrame {
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
             this.row = row;
-            return button;
+            return Tema.alDia(button);
         }
     }
 
@@ -1124,7 +1145,7 @@ public class MainWindow extends JFrame {
                 }
             }
             spinner.setValue(Math.max(1, actual));
-            return spinner;
+            return Tema.alDia(spinner);
         }
     }
 
@@ -1147,7 +1168,7 @@ public class MainWindow extends JFrame {
             int max = row < carrito.size() ? Math.max(1, carrito.get(row).getHerramienta().getStock()) : 9999;
             int actual = value instanceof Number ? ((Number) value).intValue() : 1;
             spinner.setModel(new SpinnerNumberModel(Math.max(1, Math.min(actual, max)), 1, max, 1));
-            return spinner;
+            return Tema.alDia(spinner);
         }
     }
 

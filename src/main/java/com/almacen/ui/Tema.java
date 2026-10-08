@@ -20,6 +20,9 @@ public final class Tema {
     private static final Preferences PREFS = Preferences.userNodeForPackage(Tema.class);
     private static final String PREF_OSCURO = "tema_oscuro";
     private static boolean instalado;
+    /** Sube cada vez que cambia el modo; los componentes fuera de la ventana lo comparan. */
+    private static int version;
+    private static final String VERSION = "Tema.version";
 
     private Tema() {
     }
@@ -48,10 +51,59 @@ public final class Tema {
             return;
         }
         PREFS.putBoolean(PREF_OSCURO, oscuro);
+        terminarEdiciones();
+        version++;
         FlatAnimatedLafChange.showSnapshot();
         aplicarLaf(oscuro);
         FlatLaf.updateUI();
         FlatAnimatedLafChange.hideSnapshotWithAnimation();
+    }
+
+    /**
+     * Pone al día con el modo actual un componente que no siempre está en la ventana,
+     * como el editor de una celda (FlatLaf solo actualiza lo que está en pantalla al cambiar
+     * de modo). Los editores de celda lo llaman antes de mostrarse.
+     */
+    public static <T extends java.awt.Component> T alDia(T componente) {
+        if (componente instanceof javax.swing.JComponent) {
+            javax.swing.JComponent c = (javax.swing.JComponent) componente;
+            Object v = c.getClientProperty(VERSION);
+            // La primera vez también: pudo crearse antes de un cambio de modo
+            if (!Integer.valueOf(version).equals(v)) {
+                javax.swing.SwingUtilities.updateComponentTreeUI(c);
+                c.putClientProperty(VERSION, version);
+            }
+        }
+        return componente;
+    }
+
+    /** Termina (o cancela) la edición de las tablas antes de cambiar de modo. */
+    private static void terminarEdiciones() {
+        for (java.awt.Window w : java.awt.Window.getWindows()) {
+            terminarEdiciones(w);
+        }
+    }
+
+    private static void terminarEdiciones(java.awt.Component c) {
+        if (c instanceof javax.swing.JTable) {
+            javax.swing.JTable t = (javax.swing.JTable) c;
+            if (t.isEditing()) {
+                try {
+                    if (!t.getCellEditor().stopCellEditing()) {
+                        t.getCellEditor().cancelCellEditing();
+                    }
+                } catch (RuntimeException e) {
+                    if (t.getCellEditor() != null) {
+                        t.getCellEditor().cancelCellEditing();
+                    }
+                }
+            }
+        }
+        if (c instanceof java.awt.Container) {
+            for (java.awt.Component hijo : ((java.awt.Container) c).getComponents()) {
+                terminarEdiciones(hijo);
+            }
+        }
     }
 
     /** Color del modo actual, por ejemplo color("App.muted"). */

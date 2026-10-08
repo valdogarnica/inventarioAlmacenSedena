@@ -179,7 +179,7 @@ public class HerramientasBajaDialog extends JDialog {
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
             this.row = row;
-            return button;
+            return Tema.alDia(button);
         }
     }
 

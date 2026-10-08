@@ -71,7 +71,7 @@ public final class TablaBotones {
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
             this.fila = row;
-            return button;
+            return Tema.alDia(button);
         }
     }
 }

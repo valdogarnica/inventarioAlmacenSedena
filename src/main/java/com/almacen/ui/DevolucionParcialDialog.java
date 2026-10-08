@@ -541,7 +541,7 @@ public class DevolucionParcialDialog extends JDialog {
             spinner.setModel(new SpinnerNumberModel(0, 0, max, 1));
             spinner.setValue(value instanceof Number ? value : 0);
             editingRow = row;
-            return spinner;
+            return Tema.alDia(spinner);
         }
     }
 }

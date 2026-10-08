@@ -326,7 +326,7 @@ public class VerPrestamosDialog extends JDialog {
                 button.setText("Ver");
                 button.setEnabled(true);
             }
-            return button;
+            return Tema.alDia(button);
         }
     }
 
@@ -397,7 +397,7 @@ public class VerPrestamosDialog extends JDialog {
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
             this.row = row;
-            return button;
+            return Tema.alDia(button);
         }
     }
 
