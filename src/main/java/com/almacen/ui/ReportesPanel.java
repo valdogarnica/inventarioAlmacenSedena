@@ -31,7 +31,7 @@ public class ReportesPanel extends JPanel implements Pagina {
         grid.setOpaque(false);
 
         grid.add(tarjeta("Reporte general de inventario",
-            "Todos los materiales activos con categoría, tipo, unidad, proveedor, disponible, prestado, total y fecha de alta. Incluye resumen por unidad.",
+            "Todos los materiales activos con categoría, tipo, unidad, proveedor, disponible, prestado, total y fecha de alta. Incluye las existencias acumuladas por material (sumando proveedores) y el resumen por unidad.",
             null,
             () -> PdfViewer.generarYAbrir(this, () -> ReportesPdf.inventarioGeneral(null), "No hay materiales para reportar")));
 
@@ -89,15 +89,15 @@ public class ReportesPanel extends JPanel implements Pagina {
         comboHerramienta.setPreferredSize(new Dimension(260, 28));
         ComboBuscable.instalar(comboHerramienta);
         grid.add(tarjeta("Reporte por herramienta",
-            "Préstamos activos de una herramienta con fecha, unidad, categoría, cantidad, cliente y residente.",
+            "Existencias de la herramienta sumando todos sus proveedores (con lo que tiene cada uno), sus entradas por remisión y sus préstamos activos con fecha, unidad y categoría.",
             fila("Herramienta:", comboHerramienta),
             () -> {
                 String h = (String) comboHerramienta.getSelectedItem();
                 if (h == null || h.trim().isEmpty()) {
-                    Notificaciones.showMessageDialog(this, "No hay herramientas prestadas", "Información", JOptionPane.INFORMATION_MESSAGE);
+                    Notificaciones.showMessageDialog(this, "Seleccione una herramienta", "Información", JOptionPane.INFORMATION_MESSAGE);
                     return;
                 }
-                PdfViewer.generarYAbrir(this, () -> ReportesPdf.prestamosPorHerramienta(h), "No hay préstamos activos para esa herramienta");
+                PdfViewer.generarYAbrir(this, () -> ReportesPdf.prestamosPorHerramienta(h), "No hay datos de esa herramienta");
             }));
 
         JPanel contenedor = new JPanel(new BorderLayout());
@@ -118,7 +118,7 @@ public class ReportesPanel extends JPanel implements Pagina {
         try {
             Object actual = comboHerramienta.getSelectedItem();
             comboHerramienta.removeAllItems();
-            for (String h : DatabaseManager.getInstance().obtenerHerramientasPrestadasActivas()) {
+            for (String h : DatabaseManager.getInstance().obtenerNombresMateriales()) {
                 comboHerramienta.addItem(h);
             }
             if (actual != null) {

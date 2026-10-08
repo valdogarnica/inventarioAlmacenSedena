@@ -141,7 +141,7 @@ public class VerPrestamosDevueltosDialog extends JDialog {
         btnActualizar.addActionListener(e -> cargarPagina(paginaActual));
         UIStyles.styleSecondaryButton(btnActualizar);
         Dimension btnSize = new Dimension(180, 35);
-        btnActualizar.setPreferredSize(btnSize);
+        UIStyles.tamanoMinimo(btnActualizar, btnSize.width, btnSize.height);
         UIStyles.applySvgIcon(btnActualizar, "/icons/refresh.svg", 16);
         panelBotones.add(btnActualizar);
 

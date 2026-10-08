@@ -16,7 +16,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Component;
-import java.awt.Dimension;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 
 public final class UIStyles {
@@ -91,12 +90,34 @@ public final class UIStyles {
         for (int i = 0; i < table.getColumnCount(); i++) {
             table.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
         }
+        centrarCeldas(table);
+    }
+
+    /** Centra el contenido de las celdas de texto y números, alineado con su encabezado. */
+    public static void centrarCeldas(JTable table) {
+        DefaultTableCellRenderer centro = createCenteredNumberRenderer();
+        table.setDefaultRenderer(Object.class, centro);
+        table.setDefaultRenderer(String.class, centro);
+        table.setDefaultRenderer(Number.class, centro);
+        table.setDefaultRenderer(Integer.class, centro);
+        table.setDefaultRenderer(Long.class, centro);
+        table.setDefaultRenderer(Double.class, centro);
+        table.setDefaultRenderer(Float.class, centro);
     }
 
     public static DefaultTableCellRenderer createCenteredNumberRenderer() {
         DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
         renderer.setHorizontalAlignment(SwingConstants.CENTER);
         return renderer;
+    }
+
+    /**
+     * Tamaño mínimo del botón; si el texto necesita más espacio el botón crece
+     * (a diferencia de setPreferredSize, que recorta el texto).
+     */
+    public static void tamanoMinimo(javax.swing.AbstractButton button, int ancho, int alto) {
+        button.putClientProperty("JComponent.minimumWidth", ancho);
+        button.putClientProperty("JComponent.minimumHeight", alto);
     }
 
     public static void applySvgIcon(JButton button, String resourcePath, int size) {
@@ -119,10 +140,8 @@ public final class UIStyles {
             button.setIcon(icon);
             button.setIconTextGap(6);
             button.setHorizontalTextPosition(SwingConstants.RIGHT);
-            button.setPreferredSize(new Dimension(
-                Math.max(button.getPreferredSize().width, size + 24),
-                Math.max(button.getPreferredSize().height, size + 16)
-            ));
+            // Sin tamaño fijo: el botón toma el ancho de su texto e icono
+            button.putClientProperty("JComponent.minimumHeight", size + 16);
         } catch (Exception ignored) {
             // Si falla, continuar sin icono
         }

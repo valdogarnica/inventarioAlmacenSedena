@@ -162,11 +162,11 @@ public class VerPrestamosDialog extends JDialog {
         UIStyles.applySvgIcon(btnMateriales, "/icons/search.svg", 16);
         // Aumentar tamaño de botones
         Dimension btnSize = new Dimension(180, 35);
-        btnActualizar.setPreferredSize(btnSize);
-        btnDevolver.setPreferredSize(btnSize);
-        btnReporte.setPreferredSize(btnSize);
-        btnVerDevueltos.setPreferredSize(btnSize);
-        btnMateriales.setPreferredSize(btnSize);
+        UIStyles.tamanoMinimo(btnActualizar, btnSize.width, btnSize.height);
+        UIStyles.tamanoMinimo(btnDevolver, btnSize.width, btnSize.height);
+        UIStyles.tamanoMinimo(btnReporte, btnSize.width, btnSize.height);
+        UIStyles.tamanoMinimo(btnVerDevueltos, btnSize.width, btnSize.height);
+        UIStyles.tamanoMinimo(btnMateriales, btnSize.width, btnSize.height);
         panelBotones.add(btnActualizar);
         panelBotones.add(btnDevolver);
         panelBotones.add(btnReporte);

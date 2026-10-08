@@ -1,6 +1,7 @@
 package com.almacen.database;
 
 import com.almacen.model.DetallePrestamo;
+import com.almacen.model.ExistenciaMaterial;
 import com.almacen.model.Herramienta;
 import com.almacen.model.ItemCarrito;
 import com.almacen.model.Prestamo;
@@ -644,17 +645,28 @@ public class DatabaseManager {
      * actualmente prestada de cada material.
      */
     public List<Herramienta> obtenerInventarioGeneral(Integer proveedorId) throws SQLException {
-        String sql = "SELECT h.*, p.nombre AS proveedor_nombre, " +
-                "COALESCE((SELECT SUM(d.cantidad - d.cantidad_devuelta) FROM detalle_prestamos d " +
-                "JOIN prestamos pr ON pr.id = d.prestamo_id " +
-                "WHERE d.herramienta_id = h.id AND pr.estado = 'PRESTADO'), 0) AS prestado " +
+        return obtenerInventarioConPrestado(proveedorId, null);
+    }
+
+    /** Registros activos de un material (todos sus proveedores) con lo prestado de cada uno. */
+    public List<Herramienta> obtenerExistenciasDeMaterial(String nombre) throws SQLException {
+        return obtenerInventarioConPrestado(null, nombre);
+    }
+
+    private List<Herramienta> obtenerInventarioConPrestado(Integer proveedorId, String nombre) throws SQLException {
+        String sql = "SELECT h.*, p.nombre AS proveedor_nombre, " + PRESTADO_HERRAMIENTA + " AS prestado " +
                 "FROM herramientas h LEFT JOIN proveedores p ON p.id = h.proveedor_id " +
                 "WHERE h.estado = 1" + (proveedorId != null ? " AND h.proveedor_id = ?" : "") +
+                (vacio(nombre) ? "" : " AND LOWER(TRIM(h.nombre)) = LOWER(TRIM(?))") +
                 " ORDER BY h.categoria ASC, h.nombre ASC, p.nombre ASC";
         List<Herramienta> lista = new ArrayList<>();
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            int i = 1;
             if (proveedorId != null) {
-                pstmt.setInt(1, proveedorId);
+                pstmt.setInt(i++, proveedorId);
+            }
+            if (!vacio(nombre)) {
+                pstmt.setString(i, nombre);
             }
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -665,6 +677,117 @@ public class DatabaseManager {
             }
         }
         return lista;
+    }
+
+    // ----- Existencias acumuladas por material (todos los proveedores)
+
+    /** Cantidad prestada actualmente de la herramienta h (préstamos sin devolver). */
+    private static final String PRESTADO_HERRAMIENTA =
+            "COALESCE((SELECT SUM(d.cantidad - d.cantidad_devuelta) FROM detalle_prestamos d " +
+            "JOIN prestamos pr ON pr.id = d.prestamo_id " +
+            "WHERE d.herramienta_id = h.id AND pr.estado = 'PRESTADO'), 0)";
+
+    /** Mismo material = mismo nombre (sin mayúsculas ni espacios extra) y misma unidad. */
+    private static final String CLAVE_MATERIAL =
+            "LOWER(TRIM(h.nombre)), LOWER(TRIM(COALESCE(h.unidad, '')))";
+
+    private static String havingAgrupado(String filtro, Integer proveedorId) {
+        List<String> condiciones = new ArrayList<>();
+        if (proveedorId != null) {
+            condiciones.add("SUM(CASE WHEN h.proveedor_id = ? THEN 1 ELSE 0 END) > 0");
+        }
+        if (!vacio(filtro)) {
+            condiciones.add("SUM(CASE WHEN " + FILTRO_HERRAMIENTA + " THEN 1 ELSE 0 END) > 0");
+        }
+        return condiciones.isEmpty() ? "" : " HAVING " + String.join(" AND ", condiciones);
+    }
+
+    private int setHavingAgrupado(PreparedStatement pstmt, int i, String filtro, Integer proveedorId) throws SQLException {
+        if (proveedorId != null) {
+            pstmt.setInt(i++, proveedorId);
+        }
+        if (!vacio(filtro)) {
+            i = setFiltroHerramienta(pstmt, i, filtro);
+        }
+        return i;
+    }
+
+    public int contarInventarioAgrupado(String filtro, Integer proveedorId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM (SELECT 1 FROM herramientas h " +
+                "LEFT JOIN proveedores p ON p.id = h.proveedor_id WHERE h.estado = 1 " +
+                "GROUP BY " + CLAVE_MATERIAL + havingAgrupado(filtro, proveedorId) + ")";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            setHavingAgrupado(pstmt, 1, filtro, proveedorId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    /**
+     * Existencias sumadas por material: el mismo material de varios proveedores se acumula
+     * en una fila, con el desglose de cuánto tiene cada proveedor. Los filtros eligen qué
+     * materiales mostrar, pero el total siempre incluye a todos sus proveedores.
+     */
+    public List<ExistenciaMaterial> obtenerInventarioAgrupado(String filtro, Integer proveedorId,
+                                                              int offset, int limit) throws SQLException {
+        String sql = "SELECT MIN(h.nombre) AS nombre, MIN(h.unidad) AS unidad, MIN(h.categoria) AS categoria, " +
+                "MIN(h.tipo) AS tipo, COUNT(*) AS num_proveedores, " +
+                "GROUP_CONCAT(COALESCE(p.nombre, 'Sin proveedor') || ': ' || h.stock, ' | ') AS desglose, " +
+                "SUM(h.stock) AS disponible, SUM(" + PRESTADO_HERRAMIENTA + ") AS prestado, " +
+                "MAX(h.fecha_registro) AS ultima_fecha " +
+                "FROM herramientas h LEFT JOIN proveedores p ON p.id = h.proveedor_id WHERE h.estado = 1 " +
+                "GROUP BY " + CLAVE_MATERIAL + havingAgrupado(filtro, proveedorId) +
+                " ORDER BY LOWER(MIN(h.nombre)) ASC LIMIT ? OFFSET ?";
+        List<ExistenciaMaterial> lista = new ArrayList<>();
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            int i = setHavingAgrupado(pstmt, 1, filtro, proveedorId);
+            pstmt.setInt(i++, limit);
+            pstmt.setInt(i, offset);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    ExistenciaMaterial e = new ExistenciaMaterial();
+                    e.setNombre(rs.getString("nombre"));
+                    e.setUnidad(rs.getString("unidad"));
+                    e.setCategoria(rs.getString("categoria"));
+                    e.setTipo(rs.getString("tipo"));
+                    e.setNumProveedores(rs.getInt("num_proveedores"));
+                    e.setDesglose(rs.getString("desglose"));
+                    e.setDisponible(rs.getInt("disponible"));
+                    e.setPrestado(rs.getInt("prestado"));
+                    e.setUltimaFecha(rs.getString("ultima_fecha"));
+                    lista.add(e);
+                }
+            }
+        }
+        return lista;
+    }
+
+    /** Todas las existencias acumuladas por material (para el reporte general). */
+    public List<ExistenciaMaterial> obtenerInventarioAgrupado() throws SQLException {
+        return obtenerInventarioAgrupado(null, null, 0, Integer.MAX_VALUE);
+    }
+
+    /** Nombres de los materiales activos, sin repetir aunque los surtan varios proveedores. */
+    public List<String> obtenerNombresMateriales() throws SQLException {
+        String sql = "SELECT MIN(TRIM(nombre)) AS nombre FROM herramientas WHERE estado = 1 " +
+                "GROUP BY LOWER(TRIM(nombre)) ORDER BY LOWER(MIN(TRIM(nombre))) ASC";
+        List<String> nombres = new ArrayList<>();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                nombres.add(rs.getString("nombre"));
+            }
+        }
+        return nombres;
+    }
+
+    /** Materiales activos de todos los proveedores. */
+    public List<Herramienta> obtenerMaterialesActivos() throws SQLException {
+        String sql = SELECT_HERRAMIENTA + "WHERE h.estado = 1 ORDER BY h.nombre ASC, p.nombre ASC";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            return listarHerramientas(pstmt);
+        }
     }
 
     public void actualizarStock(int herramientaId, int cantidad) throws SQLException {
@@ -1254,7 +1377,7 @@ public class DatabaseManager {
                 "JOIN detalle_prestamos d ON d.prestamo_id = p.id " +
                 "LEFT JOIN herramientas h ON h.id = d.herramienta_id " +
                 "LEFT JOIN proveedores pv ON pv.id = h.proveedor_id " +
-                "WHERE p.estado = 'PRESTADO' AND d.nombre_herramienta = ? " +
+                "WHERE p.estado = 'PRESTADO' AND LOWER(TRIM(d.nombre_herramienta)) = LOWER(TRIM(?)) " +
                 "ORDER BY p.nombre_cliente, p.fecha_prestamo DESC";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, herramienta);
@@ -1808,6 +1931,12 @@ public class DatabaseManager {
      * las fechas puede ser null para no limitar ese extremo.
      */
     public List<DetalleRemision> obtenerEntradasPorRemision(LocalDate desde, LocalDate hasta, Integer proveedorId) throws SQLException {
+        return obtenerEntradasPorRemision(desde, hasta, proveedorId, null);
+    }
+
+    /** Entradas por remisión; si se indica material, solo las de ese nombre (de cualquier proveedor). */
+    public List<DetalleRemision> obtenerEntradasPorRemision(LocalDate desde, LocalDate hasta, Integer proveedorId,
+                                                            String material) throws SQLException {
         List<DetalleRemision> entradas = new ArrayList<>();
         String sql = "SELECT d.*, r.numero_remision, r.fecha AS fecha_remision, pv.nombre AS proveedor_nombre " +
                 "FROM detalle_remisiones d " +
@@ -1816,6 +1945,7 @@ public class DatabaseManager {
                 (desde != null ? " AND r.fecha >= ?" : "") +
                 (hasta != null ? " AND r.fecha <= ?" : "") +
                 (proveedorId != null ? " AND r.proveedor_id = ?" : "") +
+                (vacio(material) ? "" : " AND LOWER(TRIM(d.nombre_material)) = LOWER(TRIM(?))") +
                 " ORDER BY r.fecha ASC, r.id ASC, d.id ASC";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             int i = 1;
@@ -1826,7 +1956,10 @@ public class DatabaseManager {
                 pstmt.setString(i++, hasta.toString());
             }
             if (proveedorId != null) {
-                pstmt.setInt(i, proveedorId);
+                pstmt.setInt(i++, proveedorId);
+            }
+            if (!vacio(material)) {
+                pstmt.setString(i, material);
             }
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {

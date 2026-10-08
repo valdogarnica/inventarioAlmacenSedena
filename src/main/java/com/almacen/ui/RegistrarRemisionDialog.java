@@ -17,6 +17,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +49,8 @@ public class RegistrarRemisionDialog extends JDialog {
     private JComboBox<String> comboMaterialEditor;
     private JLabel lblResumen;
     private Map<String, Herramienta> materialesProveedor = new HashMap<>();
+    /** Todos los registros activos de cada material (de cualquier proveedor), por nombre. */
+    private Map<String, List<Herramienta>> materialesTodos = new HashMap<>();
     private boolean guardado;
 
     public RegistrarRemisionDialog(Window parent, String empleado) {
@@ -115,7 +118,7 @@ public class RegistrarRemisionDialog extends JDialog {
         tabla.getColumnModel().getColumn(COL_NUM).setCellRenderer(centro);
         tabla.getColumnModel().getColumn(COL_CANTIDAD).setCellRenderer(centro);
         tabla.getColumnModel().getColumn(COL_ESTADO).setCellRenderer(new EstadoRenderer());
-        int[] anchos = {40, 320, 80, 100, 160, 110, 180, 170};
+        int[] anchos = {40, 290, 85, 90, 150, 100, 140, 280};
         for (int i = 0; i < anchos.length; i++) {
             tabla.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
         }
@@ -148,7 +151,7 @@ public class RegistrarRemisionDialog extends JDialog {
         UIStyles.applySvgIcon(btnQuitarFila, "/icons/delete.svg", 16);
         accionesFilas.add(btnAgregarFila);
         accionesFilas.add(btnQuitarFila);
-        JLabel ayuda = new JLabel("  Escriba el material o elija uno que ya tenga este proveedor. Las filas vacías se ignoran.");
+        JLabel ayuda = new JLabel("  Elija un material ya registrado (de cualquier proveedor) para que se sume a su total, o escriba uno nuevo. Las filas vacías se ignoran.");
         ayuda.setForeground(new Color(110, 120, 140));
         accionesFilas.add(ayuda);
         panelPartidas.add(accionesFilas, BorderLayout.SOUTH);
@@ -223,27 +226,44 @@ public class RegistrarRemisionDialog extends JDialog {
         return nombre == null ? "" : nombre.trim().replaceAll("\\s+", " ").toLowerCase();
     }
 
-    /** Carga los materiales que ya tiene el proveedor elegido para sugerirlos y detectar si existen. */
+    /**
+     * Carga los materiales de todos los proveedores para sugerirlos (así el mismo material
+     * se escribe igual y se acumula en el total) y detecta cuáles ya tiene el proveedor elegido.
+     */
     private void cargarMaterialesProveedor() {
         materialesProveedor = new HashMap<>();
+        materialesTodos = new LinkedHashMap<>();
         if (comboMaterialEditor == null) {
             return;
         }
         comboMaterialEditor.removeAllItems();
         Proveedor proveedor = selProveedor.getSeleccion();
-        if (proveedor != null) {
-            try {
-                for (Herramienta h : DatabaseManager.getInstance().obtenerMaterialesPorProveedor(proveedor.getId())) {
-                    materialesProveedor.put(clave(h.getNombre()), h);
-                    comboMaterialEditor.addItem(h.getNombre());
+        try {
+            for (Herramienta h : DatabaseManager.getInstance().obtenerMaterialesActivos()) {
+                String k = clave(h.getNombre());
+                if (!materialesTodos.containsKey(k)) {
+                    comboMaterialEditor.addItem(h.getNombre().trim());
                 }
-            } catch (Exception e) {
-                Notificaciones.showMessageDialog(this, "Error al cargar materiales del proveedor: " + e.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+                materialesTodos.computeIfAbsent(k, x -> new ArrayList<>()).add(h);
+                if (proveedor != null && h.getProveedorId() != null && h.getProveedorId() == proveedor.getId()) {
+                    materialesProveedor.put(k, h);
+                }
             }
+        } catch (Exception e) {
+            Notificaciones.showMessageDialog(this, "Error al cargar materiales: " + e.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
         }
         modelo.fireTableDataChanged();
         actualizarResumen();
+    }
+
+    /** Stock disponible del material sumando todos sus proveedores. */
+    private int stockTotal(String material) {
+        int total = 0;
+        for (Herramienta h : materialesTodos.getOrDefault(clave(material), new ArrayList<>())) {
+            total += h.getStock();
+        }
+        return total;
     }
 
     private void actualizarResumen() {
@@ -450,9 +470,15 @@ public class RegistrarRemisionDialog extends JDialog {
                         return "";
                     }
                     Herramienta h = materialesProveedor.get(clave(p.material));
-                    return h != null
-                        ? "Existente (stock " + h.getStock() + " → " + (h.getStock() + Math.max(0, p.cantidad)) + ")"
-                        : "Nuevo para este proveedor";
+                    int cantidad = Math.max(0, p.cantidad);
+                    int totalGeneral = stockTotal(p.material);
+                    String total = " · total " + totalGeneral + " → " + (totalGeneral + cantidad);
+                    if (h != null) {
+                        return "Existente (stock " + h.getStock() + " → " + (h.getStock() + cantidad) + ")" + total;
+                    }
+                    return materialesTodos.containsKey(clave(p.material))
+                        ? "Nuevo para este proveedor" + total
+                        : "Nuevo material";
                 default:
                     return "";
             }
@@ -466,8 +492,12 @@ public class RegistrarRemisionDialog extends JDialog {
                 case COL_MATERIAL:
                     p.material = valor;
                     Herramienta h = materialesProveedor.get(clave(valor));
+                    if (h == null && materialesTodos.containsKey(clave(valor))) {
+                        // Lo surte otro proveedor: se copian sus datos para que se acumule como el mismo material
+                        h = materialesTodos.get(clave(valor)).get(0);
+                    }
                     if (h != null) {
-                        // Material ya existente del proveedor: usar sus datos
+                        // Material ya existente: usar sus datos
                         p.material = h.getNombre();
                         if (h.getUnidad() != null && !h.getUnidad().trim().isEmpty()) {
                             p.unidad = h.getUnidad();
@@ -510,6 +540,10 @@ public class RegistrarRemisionDialog extends JDialog {
     }
 
     private static class EstadoRenderer extends DefaultTableCellRenderer {
+        EstadoRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
                                                        boolean hasFocus, int row, int column) {

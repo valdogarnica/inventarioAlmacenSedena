@@ -257,7 +257,7 @@ public class MainWindow extends JFrame {
         JButton btnBuscar = new JButton("Buscar");
         btnBuscar.addActionListener(e -> buscarHerramientas());
         UIStyles.stylePrimaryButton(btnBuscar);
-        btnBuscar.setPreferredSize(new Dimension(120, 34));
+        UIStyles.tamanoMinimo(btnBuscar, 120, 34);
         UIStyles.applySvgIcon(btnBuscar, "/icons/search.svg", 16);
         JPanel panelBuscarBtn = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelBuscarBtn.setOpaque(false);
@@ -303,13 +303,13 @@ public class MainWindow extends JFrame {
         btnAnterior = new JButton("Anterior");
         btnAnterior.addActionListener(e -> cargarPagina(paginaActual - 1));
         UIStyles.styleSecondaryButton(btnAnterior);
-        btnAnterior.setPreferredSize(new Dimension(120, 34));
+        UIStyles.tamanoMinimo(btnAnterior, 120, 34);
         UIStyles.applySvgIcon(btnAnterior, "/icons/menorque.svg", 16);
         panelPaginacion.add(btnAnterior);
         btnSiguiente = new JButton("Siguiente");
         btnSiguiente.addActionListener(e -> cargarPagina(paginaActual + 1));
         UIStyles.styleSecondaryButton(btnSiguiente);
-        btnSiguiente.setPreferredSize(new Dimension(120, 34));
+        UIStyles.tamanoMinimo(btnSiguiente, 120, 34);
         UIStyles.applySvgIcon(btnSiguiente, "/icons/mayorque.svg", 16);
         panelPaginacion.add(btnSiguiente);
         lblPagina = new JLabel("Página 1 de 1");
@@ -362,7 +362,7 @@ public class MainWindow extends JFrame {
         UIStyles.applySvgIcon(btnQuitarCarrito, "/icons/cancel.svg", 16);
         UIStyles.applySvgIcon(btnLimpiarCarrito, "/icons/delete.svg", 16);
         UIStyles.applySvgIcon(btnRealizarPrestamo, "/icons/save.svg", 16);
-        btnRealizarPrestamo.setPreferredSize(new Dimension(165, 40));
+        UIStyles.tamanoMinimo(btnRealizarPrestamo, 165, 40);
         panelBotonesSecundarios.add(btnQuitarCarrito);
         panelBotonesSecundarios.add(btnLimpiarCarrito);
         panelBotonesCarrito.add(panelBotonesSecundarios, BorderLayout.NORTH);

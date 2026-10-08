@@ -2,6 +2,7 @@ package com.almacen.report;
 
 import com.almacen.database.DatabaseManager;
 import com.almacen.model.DetalleRemision;
+import com.almacen.model.ExistenciaMaterial;
 import com.almacen.model.Herramienta;
 import com.almacen.model.Proveedor;
 import com.almacen.model.Remision;
@@ -82,6 +83,27 @@ public final class ReportesPdf {
                 filas,
                 new String[]{"", "TOTAL", "", "", "", "", String.valueOf(totalStock), String.valueOf(totalPrestado),
                     String.valueOf(totalStock + totalPrestado), ""});
+
+            if (proveedorId == null) {
+                pdf.subtitulo("Existencias acumuladas por material (todos los proveedores)");
+                List<String[]> acumuladas = new ArrayList<>();
+                for (ExistenciaMaterial e : db.obtenerInventarioAgrupado()) {
+                    acumuladas.add(new String[]{
+                        safe(e.getNombre()),
+                        safe(e.getUnidad()),
+                        safe(e.getDesglose()),
+                        String.valueOf(e.getDisponible()),
+                        String.valueOf(e.getPrestado()),
+                        String.valueOf(e.getTotal())
+                    });
+                }
+                pdf.tabla(new String[]{"Material", "Unidad", "Desglose por proveedor", "Disponible", "Prestado", "Total"},
+                    new float[]{22, 7, 41, 8, 7, 6},
+                    new boolean[]{false, false, false, true, true, true},
+                    acumuladas,
+                    new String[]{"TOTAL", "", "", String.valueOf(totalStock), String.valueOf(totalPrestado),
+                        String.valueOf(totalStock + totalPrestado)});
+            }
 
             pdf.subtitulo("Resumen por unidad");
             List<String[]> resumen = new ArrayList<>();
@@ -226,41 +248,121 @@ public final class ReportesPdf {
         }
     }
 
-    /** REPORTE POR HERRAMIENTA: préstamos activos de una herramienta con fecha, unidad y categoría. */
+    /**
+     * REPORTE POR HERRAMIENTA: existencias de la herramienta sumando todos sus proveedores
+     * (con el desglose de cada uno), sus entradas por remisión y sus préstamos activos.
+     */
     public static File prestamosPorHerramienta(String herramienta) throws Exception {
-        List<ReportePrestamoItem> items = DatabaseManager.getInstance().obtenerReportePrestamosActivosPorHerramienta(herramienta);
-        if (items.isEmpty()) {
+        DatabaseManager db = DatabaseManager.getInstance();
+        List<Herramienta> existencias = db.obtenerExistenciasDeMaterial(herramienta);
+        List<ReportePrestamoItem> prestamos = db.obtenerReportePrestamosActivosPorHerramienta(herramienta);
+        if (existencias.isEmpty() && prestamos.isEmpty()) {
             return null;
         }
-        try (PdfReportBuilder pdf = new PdfReportBuilder("REPORTE DE PRÉSTAMOS POR HERRAMIENTA", true)) {
-            ReportePrestamoItem primero = items.get(0);
-            pdf.datos(new String[][]{
-                {"Herramienta", herramienta},
-                {"Categoría", safe(primero.getCategoria())},
-                {"Unidad", safe(primero.getUnidad())}
-            }, 3);
-            pdf.espacio(6);
-            List<String[]> filas = new ArrayList<>();
-            int total = 0;
-            for (ReportePrestamoItem item : items) {
-                filas.add(new String[]{
-                    safe(item.getNombreHerramienta()),
-                    safe(item.getCategoria()),
-                    safe(item.getUnidad()),
-                    guion(item.getProveedor()),
-                    String.valueOf(item.getCantidad()),
-                    safe(item.getNombreCliente()),
-                    safe(item.getResidenteSobrestante()),
-                    fechaHora(item.getFechaPrestamo())
-                });
-                total += item.getCantidad();
+        List<DetalleRemision> entradas = db.obtenerEntradasPorRemision(null, null, null, herramienta);
+        try (PdfReportBuilder pdf = new PdfReportBuilder("REPORTE POR HERRAMIENTA", true)) {
+            String categoria = "";
+            String tipo = "";
+            String unidad = "";
+            if (!existencias.isEmpty()) {
+                Herramienta h = existencias.get(0);
+                categoria = safe(h.getCategoria());
+                tipo = safe(h.getTipo());
+                unidad = safe(h.getUnidad());
+            } else {
+                categoria = safe(prestamos.get(0).getCategoria());
+                unidad = safe(prestamos.get(0).getUnidad());
             }
-            pdf.tabla(new String[]{"Herramienta", "Categoría", "Unidad", "Proveedor", "Cantidad", "Cliente", "Residente", "Fecha préstamo"},
-                new float[]{20, 13, 7, 12, 7, 15, 15, 11},
-                new boolean[]{false, false, false, false, true, false, false, false},
-                filas,
-                new String[]{"TOTAL", "", "", "", String.valueOf(total), "", "", ""});
-            return pdf.guardarTemporal("reporte_prestamos_herramienta_");
+            int disponible = 0;
+            int prestado = 0;
+            List<String[]> filas = new ArrayList<>();
+            for (Herramienta h : existencias) {
+                filas.add(new String[]{
+                    guion(h.getProveedorNombre()),
+                    safe(h.getUnidad()),
+                    safe(h.getCategoria()),
+                    safe(h.getTipo()),
+                    String.valueOf(h.getStock()),
+                    String.valueOf(h.getCantidadPrestada()),
+                    String.valueOf(h.getStock() + h.getCantidadPrestada()),
+                    guion(h.getRemision()),
+                    fecha(h.getFechaRegistro())
+                });
+                disponible += h.getStock();
+                prestado += h.getCantidadPrestada();
+            }
+            pdf.datos(new String[][]{
+                {"Herramienta", safe(existencias.isEmpty() ? herramienta : existencias.get(0).getNombre())},
+                {"Categoría", categoria},
+                {"Tipo", tipo},
+                {"Unidad", unidad},
+                {"Proveedores", String.valueOf(existencias.size())},
+                {"Disponible total", String.valueOf(disponible)},
+                {"Prestado", String.valueOf(prestado)},
+                {"Total", String.valueOf(disponible + prestado)}
+            }, 4);
+
+            pdf.subtitulo("Existencias por proveedor (se suman en el total)");
+            if (filas.isEmpty()) {
+                pdf.linea("La herramienta ya no tiene registros activos en el inventario.");
+            } else {
+                pdf.tabla(new String[]{"Proveedor", "Unidad", "Categoría", "Tipo", "Disponible", "Prestado", "Total",
+                        "Últ. remisión", "Fecha alta"},
+                    new float[]{20, 8, 14, 10, 8, 8, 7, 10, 9},
+                    new boolean[]{false, false, false, false, true, true, true, false, false},
+                    filas,
+                    new String[]{"TOTAL", "", "", "", String.valueOf(disponible), String.valueOf(prestado),
+                        String.valueOf(disponible + prestado), "", ""});
+            }
+
+            pdf.subtitulo("Entradas por remisión");
+            if (entradas.isEmpty()) {
+                pdf.linea("Sin entradas por remisión registradas.");
+            } else {
+                List<String[]> filasEntradas = new ArrayList<>();
+                int totalEntradas = 0;
+                for (DetalleRemision d : entradas) {
+                    filasEntradas.add(new String[]{
+                        d.getFechaRemision() != null ? d.getFechaRemision().format(FECHA) : "",
+                        guion(d.getNumeroRemision()),
+                        safe(d.getProveedorNombre()),
+                        safe(d.getUnidad()),
+                        String.valueOf(d.getCantidad())
+                    });
+                    totalEntradas += d.getCantidad();
+                }
+                pdf.tabla(new String[]{"Fecha", "Remisión", "Proveedor", "Unidad", "Cantidad"},
+                    new float[]{10, 12, 24, 10, 8},
+                    new boolean[]{false, false, false, false, true},
+                    filasEntradas,
+                    new String[]{"TOTAL", "", "", "", String.valueOf(totalEntradas)});
+            }
+
+            pdf.subtitulo("Préstamos activos");
+            if (prestamos.isEmpty()) {
+                pdf.linea("No hay préstamos activos de esta herramienta.");
+            } else {
+                List<String[]> filasPrestamos = new ArrayList<>();
+                int total = 0;
+                for (ReportePrestamoItem item : prestamos) {
+                    filasPrestamos.add(new String[]{
+                        fechaHora(item.getFechaPrestamo()),
+                        guion(item.getProveedor()),
+                        safe(item.getUnidad()),
+                        safe(item.getCategoria()),
+                        String.valueOf(item.getCantidad()),
+                        safe(item.getNombreCliente()),
+                        safe(item.getResidenteSobrestante())
+                    });
+                    total += item.getCantidad();
+                }
+                pdf.tabla(new String[]{"Fecha préstamo", "Proveedor", "Unidad", "Categoría", "Cantidad", "Cliente", "Residente"},
+                    new float[]{11, 14, 7, 13, 7, 17, 17},
+                    new boolean[]{false, false, false, false, true, false, false},
+                    filasPrestamos,
+                    new String[]{"TOTAL", "", "", "", String.valueOf(total), "", ""});
+            }
+            return pdf.guardarTemporal("reporte_herramienta_");
         }
     }
 

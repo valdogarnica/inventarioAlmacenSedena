@@ -6,7 +6,7 @@ Sistema de gestión de inventario con préstamos de herramientas desarrollado en
 
 - ✅ Menú lateral paginado: cada sección es una página (Nuevo préstamo, Préstamos registrados, Inventario, Remisiones, Proveedores, Categorías/tipos/unidades, Reportes, Configuración). Atajos Ctrl+1 … Ctrl+8
 - ✅ Remisiones de proveedor: se registra el número de remisión (texto libre), proveedor, obra, quién envía, quién recibe, fecha y todos los materiales con su cantidad y unidad
-- ✅ Cada material pertenece a su proveedor: el mismo material de dos proveedores se guarda en dos registros, cada uno con su propio stock
+- ✅ Cada material pertenece a su proveedor y además se acumula: el mismo material de dos proveedores se guarda en dos registros (cada uno con su stock), y la vista "Total por material" del inventario suma ambos y muestra cuánto tiene cada proveedor
 - ✅ Proveedores con sus materiales y sus remisiones
 - ✅ Catálogos administrables de Categorías, Tipos y Unidades (se eligen en combos y se pueden agregar desde los formularios)
 - ✅ Búsqueda en todas las listas desplegables: al abrir un combo aparece "Escriba para buscar…" y lo que se teclea filtra las opciones (sin importar mayúsculas ni acentos; Enter elige el resultado)
@@ -94,7 +94,7 @@ En la página **Reportes**:
 - **Inventario por proveedor**
 - **Entradas por remisión** en un rango de fechas
 - **Préstamos activos (general)**
-- **Reporte por herramienta**: préstamos activos con fecha, unidad y categoría
+- **Reporte por herramienta**: total de la herramienta sumando proveedores con el desglose de cada uno, sus entradas por remisión y sus préstamos activos con fecha, unidad y categoría
 
 ## Estructura del Proyecto
 
