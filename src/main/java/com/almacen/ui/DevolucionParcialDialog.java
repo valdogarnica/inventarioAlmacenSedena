@@ -4,10 +4,6 @@ import com.almacen.database.DatabaseManager;
 import com.almacen.model.DevolucionItem;
 import com.almacen.model.DetallePrestamo;
 import com.almacen.model.Prestamo;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -23,6 +19,8 @@ import javax.imageio.ImageIO;
 public class DevolucionParcialDialog extends JDialog {
     private final int prestamoId;
     private Prestamo prestamo;
+    /** Material de no retorno del préstamo: no se devuelve, solo aparece en el comprobante. */
+    private List<DetallePrestamo> noRetorno = new ArrayList<>();
     private JTable tabla;
     private DevolucionTableModel modelo;
     private JCheckBox chkEntregaCompleta;
@@ -244,7 +242,11 @@ public class DevolucionParcialDialog extends JDialog {
         try {
             DatabaseManager dbManager = DatabaseManager.getInstance();
             prestamo = dbManager.obtenerPrestamoPorId(prestamoId);
-            List<DetallePrestamo> detalles = dbManager.obtenerDetallesPrestamo(prestamoId);
+            List<DetallePrestamo> detalles = new ArrayList<>();
+            noRetorno = new ArrayList<>();
+            for (DetallePrestamo d : DetallePrestamo.agrupar(dbManager.obtenerDetallesPrestamo(prestamoId))) {
+                (d.isNoRetorno() ? noRetorno : detalles).add(d);
+            }
             modelo.setDetalles(detalles);
             chkEntregaCompleta.setSelected(false);
             tabla.setEnabled(true);
@@ -278,9 +280,14 @@ public class DevolucionParcialDialog extends JDialog {
             }
             DatabaseManager dbManager = DatabaseManager.getInstance();
             dbManager.registrarDevolucionParcial(prestamoId, devoluciones);
-            Notificaciones.showMessageDialog(this,
-                "Devolución registrada",
-                "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            // Con los datos de antes de recargar: "devuelto antes" y "devuelto ahora" quedan bien
+            List<DetallePrestamo> detalles = new ArrayList<>(modelo.detalles);
+            List<Integer> devuelto = new ArrayList<>(modelo.devolver);
+            List<String> obs = modelo.observacionesComprobante();
+            if (Alerta.confirmar(this, "La devolución quedó registrada. ¿Desea abrir el comprobante en PDF?",
+                    "Devolución registrada", Alerta.Tipo.EXITO, "Abrir comprobante", "Ahora no")) {
+                abrirComprobante(detalles, devuelto, obs, false);
+            }
             cargarDatos();
         } catch (Exception e) {
             Notificaciones.showMessageDialog(this,
@@ -289,196 +296,30 @@ public class DevolucionParcialDialog extends JDialog {
         }
     }
 
+    /** Vista previa del comprobante con las cantidades capturadas, antes de registrar. */
     private void generarComprobante() {
-        try {
-            boolean hayDevolucion = false;
-            for (int i = 0; i < modelo.detalles.size(); i++) {
-                if (modelo.devolver.get(i) > 0) {
-                    hayDevolucion = true;
-                    break;
-                }
-            }
-            if (!hayDevolucion) {
-                Notificaciones.showMessageDialog(this,
-                    "No hay cantidades para devolver",
-                    "Información", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-
-            java.io.File archivo = java.io.File.createTempFile("comprobante_devolucion_", ".pdf");
-            archivo.deleteOnExit();
-
-            try (PDDocument document = new PDDocument()) {
-                PDPage page = new PDPage();
-                document.addPage(page);
-                PDPageContentStream content = new PDPageContentStream(document, page);
-                float margin = 40;
-                float y = 720; // Bajamos más el contenido inicial
-                float rowHeight = 16; // Aumentamos el alto de fila para mejor legibilidad
-
-                content.setFont(PDType1Font.HELVETICA_BOLD, 16);
-                y = writeLine(content, "Comprobante de devolución (vista previa)", margin, y);
-                y -= 10; // Espacio adicional después del título
-                content.setFont(PDType1Font.HELVETICA, 11);
-                String cliente = prestamo != null ? prestamo.getNombreCliente() : "";
-                String residente = prestamo != null ? prestamo.getResidenteSobrestante() : "";
-                y = writeLine(content, "Cliente: " + cliente, margin, y);
-                y = writeLine(content, "Residente/Sobrestante: " + residente, margin, y);
-                y = writeLine(content, "Fecha: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), margin, y);
-                y -= 20; // Más espacio antes de la tabla
-
-                // Mejorar alineación de columnas
-                float colHerr = margin + 5;
-                float colPrest = margin + 280; // Ajustado para mejor alineación
-                float colDev = margin + 360;   // Ajustado para mejor alineación
-                float colPend = margin + 440;  // Ajustado para mejor alineación
-                float tableRight = margin + 520;
-
-                y = drawTableHeader(content, y, rowHeight, colHerr, colPrest, colDev, colPend, tableRight);
-
-                for (int i = 0; i < modelo.detalles.size(); i++) {
-                    int devolverAhora = modelo.devolver.get(i);
-                    DetallePrestamo d = modelo.detalles.get(i);
-                    int pendienteBase = d.getPendiente();
-                    int pendienteNuevo = Math.max(0, pendienteBase - devolverAhora);
-
-                    if (y < margin + 80) {
-                        content.close();
-                        page = new PDPage();
-                        document.addPage(page);
-                        content = new PDPageContentStream(document, page);
-                        y = 720;
-                        y = drawTableHeader(content, y, rowHeight, colHerr, colPrest, colDev, colPend, tableRight);
-                    }
-                    drawRowLine(content, y, tableRight, rowHeight, colHerr, colPrest, colDev, colPend);
-                    content.setFont(PDType1Font.HELVETICA, 10);
-                    // Texto alineado a la izquierda para herramienta
-                    writeText(content, d.getNombreHerramienta(), colHerr, y);
-                    // Números centrados
-                    writeTextCentered(content, String.valueOf(d.getCantidad()), colPrest, colDev - 5, y);
-                    writeTextCentered(content, String.valueOf(devolverAhora), colDev, colPend - 5, y);
-                    writeTextCentered(content, String.valueOf(pendienteNuevo), colPend, tableRight, y);
-                    y -= rowHeight;
-                }
-
-                content.close();
-                document.save(archivo);
-            }
-
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().open(archivo);
-            } else {
-                Notificaciones.showMessageDialog(this,
-                    "Vista previa generada en: " + archivo.getAbsolutePath(),
-                    "Información", JOptionPane.INFORMATION_MESSAGE);
-            }
-        } catch (Exception e) {
-            Notificaciones.showMessageDialog(this,
-                "Error al generar comprobante: " + e.getMessage(),
-                "Error", JOptionPane.ERROR_MESSAGE);
+        boolean hayDevolucion = false;
+        for (int cantidad : modelo.devolver) {
+            hayDevolucion |= cantidad > 0;
         }
+        if (!hayDevolucion) {
+            Notificaciones.showMessageDialog(this,
+                "No hay cantidades para devolver",
+                "Información", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        abrirComprobante(modelo.detalles, modelo.devolver, modelo.observacionesComprobante(), true);
     }
 
-    private float writeLine(PDPageContentStream content, String text, float x, float y) throws Exception {
-        content.beginText();
-        content.newLineAtOffset(x, y);
-        content.showText(text);
-        content.endText();
-        return y - 14;
+    private void abrirComprobante(List<DetallePrestamo> detalles, List<Integer> devuelto,
+                                  List<String> observaciones, boolean vistaPrevia) {
+        List<DetallePrestamo> todos = new ArrayList<>(detalles);
+        todos.addAll(noRetorno);
+        PdfViewer.generarYAbrir(this,
+            () -> com.almacen.report.ReportesPdf.comprobanteDevolucion(prestamo, todos, devuelto, observaciones, vistaPrevia),
+            "No se pudo generar el comprobante");
     }
 
-    private void writeText(PDPageContentStream content, String text, float x, float y) throws Exception {
-        content.beginText();
-        content.newLineAtOffset(x, y);
-        content.showText(text);
-        content.endText();
-    }
-    
-    private void writeTextCentered(PDPageContentStream content, String text, float leftX, float rightX, float y) throws Exception {
-        // Calcular ancho del texto usando el tamaño de fuente actual (10)
-        float fontSize = 10f;
-        float textWidth = PDType1Font.HELVETICA.getStringWidth(text) / 1000f * fontSize;
-        float centerX = (leftX + rightX) / 2f;
-        float startX = centerX - (textWidth / 2f);
-        content.beginText();
-        content.setFont(PDType1Font.HELVETICA, fontSize);
-        content.newLineAtOffset(startX, y);
-        content.showText(text);
-        content.endText();
-    }
-
-    private float drawTableHeader(PDPageContentStream content, float y, float rowHeight,
-                                  float colHerr, float colPrest, float colDev, float colPend, float tableRight) throws Exception {
-        float headerTop = y + 6;
-        float headerBottom = y - rowHeight + 2;
-        
-        // Dibujar fondo del header
-        content.setNonStrokingColor(new Color(230, 230, 230));
-        content.addRect(colHerr - 5, headerBottom, tableRight - colHerr + 10, rowHeight + 4);
-        content.fill();
-        
-        // Dibujar bordes
-        content.setNonStrokingColor(Color.BLACK);
-        content.setLineWidth(0.5f);
-        // Línea superior
-        content.moveTo(colHerr - 5, headerTop);
-        content.lineTo(tableRight + 5, headerTop);
-        content.stroke();
-        // Línea inferior
-        content.moveTo(colHerr - 5, headerBottom);
-        content.lineTo(tableRight + 5, headerBottom);
-        content.stroke();
-        
-        // Líneas verticales
-        drawVerticalLines(content, y, rowHeight, colHerr, colPrest, colDev, colPend, tableRight);
-
-        content.setFont(PDType1Font.HELVETICA_BOLD, 11);
-        // Centrar texto en encabezados numéricos
-        writeTextCentered(content, "Herramienta", colHerr, colPrest - 5, y);
-        writeTextCentered(content, "Prestado", colPrest, colDev - 5, y);
-        writeTextCentered(content, "Devuelto", colDev, colPend - 5, y);
-        writeTextCentered(content, "Pendiente", colPend, tableRight, y);
-        return y - rowHeight - 2;
-    }
-
-    private void drawRowLine(PDPageContentStream content, float y, float tableRight, float rowHeight,
-                             float colHerr, float colPrest, float colDev, float colPend) throws Exception {
-        content.setLineWidth(0.4f);
-        float lineY = y - rowHeight + 2;
-        content.moveTo(colHerr - 5, lineY);
-        content.lineTo(tableRight + 5, lineY);
-        content.stroke();
-        drawVerticalLines(content, y, rowHeight, colHerr, colPrest, colDev, colPend, tableRight);
-    }
-
-    private void drawVerticalLines(PDPageContentStream content, float y, float rowHeight,
-                                   float colHerr, float colPrest, float colDev, float colPend, float tableRight) throws Exception {
-        float top = y + 6;
-        float bottom = y - rowHeight + 2;
-        float left = colHerr - 5;
-        float right = tableRight + 5;
-        content.setLineWidth(0.4f);
-        // Línea izquierda
-        content.moveTo(left, top);
-        content.lineTo(left, bottom);
-        content.stroke();
-        // Línea entre Herramienta y Prestado
-        content.moveTo(colPrest - 5, top);
-        content.lineTo(colPrest - 5, bottom);
-        content.stroke();
-        // Línea entre Prestado y Devuelto
-        content.moveTo(colDev - 5, top);
-        content.lineTo(colDev - 5, bottom);
-        content.stroke();
-        // Línea entre Devuelto y Pendiente
-        content.moveTo(colPend - 5, top);
-        content.lineTo(colPend - 5, bottom);
-        content.stroke();
-        // Línea derecha
-        content.moveTo(right, top);
-        content.lineTo(right, bottom);
-        content.stroke();
-    }
     private void aplicarEntregaCompleta() {
         boolean entregarTodo = chkEntregaCompleta.isSelected();
         modelo.setDevolverTodo(entregarTodo);
@@ -520,11 +361,18 @@ public class DevolucionParcialDialog extends JDialog {
             List<DevolucionItem> items = new ArrayList<>();
             for (int i = 0; i < detalles.size(); i++) {
                 int cant = devolver.get(i);
-                if (cant > 0) {
+                // Una fila puede juntar el mismo material de varios proveedores: lo devuelto
+                // se reparte entre sus partidas según lo que cada una tiene pendiente
+                for (DetallePrestamo parte : detalles.get(i).getPartes()) {
+                    int tomar = Math.min(cant, parte.getPendiente());
+                    if (tomar <= 0) {
+                        continue;
+                    }
+                    cant -= tomar;
                     DevolucionItem item = new DevolucionItem();
-                    item.setHerramientaId(detalles.get(i).getHerramientaId());
-                    item.setNombreHerramienta(detalles.get(i).getNombreHerramienta());
-                    item.setCantidadDevolver(cant);
+                    item.setHerramientaId(parte.getHerramientaId());
+                    item.setNombreHerramienta(parte.getNombreHerramienta());
+                    item.setCantidadDevolver(tomar);
                     if (conObservacion.get(i)) {
                         item.setObservacion(observaciones.get(i));
                     } else {
@@ -633,6 +481,15 @@ public class DevolucionParcialDialog extends JDialog {
                 return Boolean.class;
             }
             return String.class;
+        }
+
+        /** Observación de cada fila (vacía si no se marcó). */
+        public List<String> observacionesComprobante() {
+            List<String> lista = new ArrayList<>();
+            for (int i = 0; i < detalles.size(); i++) {
+                lista.add(conObservacion.get(i) && devolver.get(i) > 0 ? observaciones.get(i) : "");
+            }
+            return lista;
         }
 
         public boolean tieneObservacionesIncompletas() {

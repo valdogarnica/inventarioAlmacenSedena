@@ -198,6 +198,21 @@ public class DatabaseManager {
 
         // Insertar datos de ejemplo si la tabla está vacía
         insertarDatosEjemplo();
+        migrarNoRetorno();
+    }
+
+    /**
+     * Versión 3: el tipo "Material" pasa a ser de no retorno (la mayoría del material
+     * no se devuelve). Solo se hace una vez; después el usuario lo cambia en Catálogos.
+     */
+    private void migrarNoRetorno() throws SQLException {
+        if (obtenerVersionEsquema() >= VERSION_NO_RETORNO) {
+            return;
+        }
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("UPDATE tipos SET no_retorno = 1 WHERE LOWER(TRIM(nombre)) = 'material'");
+            stmt.execute("PRAGMA user_version = " + VERSION_NO_RETORNO);
+        }
     }
 
     private void insertarDatosEjemplo() throws SQLException {
@@ -264,6 +279,9 @@ public class DatabaseManager {
 
     private void ensureDetalleColumns() throws SQLException {
         ensureColumn("detalle_prestamos", "cantidad_devuelta", "INTEGER NOT NULL DEFAULT 0");
+        // Material de no retorno: sale del almacén con el préstamo y no se espera de regreso
+        ensureColumn("detalle_prestamos", "no_retorno", "INTEGER NOT NULL DEFAULT 0");
+        ensureColumn("tipos", "no_retorno", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private void ensureHerramientaColumns() throws SQLException {
@@ -310,6 +328,7 @@ public class DatabaseManager {
 
     /** Versión del esquema guardada en la propia base (PRAGMA user_version). */
     private static final int VERSION_ESQUEMA = 2;
+    private static final int VERSION_NO_RETORNO = 3;
 
     private int obtenerVersionEsquema() throws SQLException {
         try (Statement stmt = connection.createStatement();
@@ -685,7 +704,7 @@ public class DatabaseManager {
     private static final String PRESTADO_HERRAMIENTA =
             "COALESCE((SELECT SUM(d.cantidad - d.cantidad_devuelta) FROM detalle_prestamos d " +
             "JOIN prestamos pr ON pr.id = d.prestamo_id " +
-            "WHERE d.herramienta_id = h.id AND pr.estado = 'PRESTADO'), 0)";
+            "WHERE d.herramienta_id = h.id AND pr.estado = 'PRESTADO' AND d.no_retorno = 0), 0)";
 
     /** Mismo material = mismo nombre (sin mayúsculas ni espacios extra) y misma unidad. */
     private static final String CLAVE_MATERIAL =
@@ -920,6 +939,27 @@ public class DatabaseManager {
         }
     }
 
+    /** Nombres (en minúsculas) de los tipos marcados como material de no retorno. */
+    public java.util.Set<String> obtenerTiposNoRetorno() throws SQLException {
+        java.util.Set<String> tipos = new java.util.HashSet<>();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT nombre FROM tipos WHERE no_retorno = 1")) {
+            while (rs.next()) {
+                tipos.add(rs.getString("nombre").trim().toLowerCase());
+            }
+        }
+        return tipos;
+    }
+
+    public void setTipoNoRetorno(String tipo, boolean noRetorno) throws SQLException {
+        try (PreparedStatement pstmt = connection.prepareStatement(
+                "UPDATE tipos SET no_retorno = ? WHERE nombre = ?")) {
+            pstmt.setInt(1, noRetorno ? 1 : 0);
+            pstmt.setString(2, tipo);
+            pstmt.executeUpdate();
+        }
+    }
+
     public List<String> obtenerCategorias() throws SQLException {
         return obtenerCatalogo(Catalogo.CATEGORIAS);
     }
@@ -957,18 +997,105 @@ public class DatabaseManager {
         throw new SQLException("No se pudo generar el ID del préstamo");
     }
 
-    private void insertarDetallePrestamo(int prestamoId, ItemCarrito item) throws SQLException {
-        String sql = "INSERT INTO detalle_prestamos (prestamo_id, herramienta_id, nombre_herramienta, categoria, cantidad, cantidad_devuelta) " +
-                "VALUES (?, ?, ?, ?, ?, 0)";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, prestamoId);
-            pstmt.setInt(2, item.getIdHerramienta());
-            pstmt.setString(3, item.getNombre());
-            pstmt.setString(4, item.getCategoria());
-            pstmt.setInt(5, item.getCantidad());
-            pstmt.executeUpdate();
+    /**
+     * Registra un material del carrito. El carrito junta el mismo material de todos los
+     * proveedores, así que la cantidad se toma de sus registros empezando por el que tiene
+     * más stock. Devuelve true si es material de retorno (hay que devolverlo).
+     */
+    private boolean insertarDetallePrestamo(int prestamoId, ItemCarrito item) throws SQLException {
+        String select = "SELECT h.id, h.nombre, h.categoria, h.stock, COALESCE(t.no_retorno, 0) AS no_retorno " +
+                "FROM herramientas h LEFT JOIN tipos t ON LOWER(TRIM(t.nombre)) = LOWER(TRIM(h.tipo)) " +
+                "WHERE h.estado = 1 AND h.stock > 0 AND " + MISMO_MATERIAL +
+                " ORDER BY h.stock DESC, h.id ASC";
+        String insert = "INSERT INTO detalle_prestamos (prestamo_id, herramienta_id, nombre_herramienta, categoria, " +
+                "cantidad, cantidad_devuelta, no_retorno) VALUES (?, ?, ?, ?, ?, 0, ?)";
+        int restante = item.getCantidad();
+        boolean retorno = false;
+        try (PreparedStatement pstmt = connection.prepareStatement(select)) {
+            pstmt.setString(1, item.getNombre());
+            pstmt.setString(2, item.getUnidad());
+            try (ResultSet rs = pstmt.executeQuery();
+                 PreparedStatement ins = connection.prepareStatement(insert)) {
+                while (restante > 0 && rs.next()) {
+                    int tomar = Math.min(restante, rs.getInt("stock"));
+                    int id = rs.getInt("id");
+                    boolean noRetorno = rs.getInt("no_retorno") == 1;
+                    ins.setInt(1, prestamoId);
+                    ins.setInt(2, id);
+                    ins.setString(3, rs.getString("nombre"));
+                    ins.setString(4, rs.getString("categoria") != null ? rs.getString("categoria") : "");
+                    ins.setInt(5, tomar);
+                    ins.setInt(6, noRetorno ? 1 : 0);
+                    ins.executeUpdate();
+                    actualizarStock(id, -tomar);
+                    retorno |= !noRetorno;
+                    restante -= tomar;
+                }
+            }
         }
-        actualizarStock(item.getIdHerramienta(), -item.getCantidad());
+        if (restante > 0) {
+            throw new SQLException("No hay suficiente stock de " + item.getNombre() + ": faltan " + restante);
+        }
+        return retorno;
+    }
+
+    /** Mismo material (nombre y unidad) sin importar el proveedor; parámetros: nombre, unidad. */
+    private static final String MISMO_MATERIAL =
+            "LOWER(TRIM(h.nombre)) = LOWER(TRIM(?)) AND LOWER(TRIM(COALESCE(h.unidad, ''))) = LOWER(TRIM(COALESCE(?, '')))";
+
+    /** Stock total de un material sumando todos sus proveedores. */
+    public int obtenerStockMaterial(String nombre, String unidad) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(h.stock), 0) FROM herramientas h WHERE h.estado = 1 AND " + MISMO_MATERIAL;
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nombre);
+            pstmt.setString(2, unidad);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    private static final String SELECT_PRESTABLE =
+            "SELECT MIN(h.id) AS id, MIN(TRIM(h.nombre)) AS nombre, MIN(h.categoria) AS categoria, " +
+            "MIN(h.tipo) AS tipo, MIN(h.unidad) AS unidad, SUM(h.stock) AS stock " +
+            "FROM herramientas h LEFT JOIN proveedores p ON p.id = h.proveedor_id WHERE h.estado = 1";
+
+    /** Cuántos materiales distintos (sumando proveedores) coinciden con la búsqueda de préstamo. */
+    public int contarMaterialesPrestables(String busqueda) throws SQLException {
+        // La búsqueda va en HAVING para que el stock sume todos los proveedores aunque
+        // el texto solo coincida con uno de ellos
+        String sql = "SELECT COUNT(*) FROM (" + SELECT_PRESTABLE +
+                " GROUP BY " + CLAVE_MATERIAL + havingAgrupado(busqueda, null) + ")";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            setHavingAgrupado(pstmt, 1, busqueda, null);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    /**
+     * Materiales para préstamo: el mismo material de varios proveedores aparece una sola vez
+     * con el stock sumado.
+     */
+    public List<Herramienta> buscarMaterialesPrestables(String busqueda, int offset, int limit) throws SQLException {
+        String sql = SELECT_PRESTABLE + " GROUP BY " + CLAVE_MATERIAL + havingAgrupado(busqueda, null) + " ORDER BY LOWER(MIN(TRIM(h.nombre))) ASC LIMIT ? OFFSET ?";
+        List<Herramienta> lista = new ArrayList<>();
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            int i = setHavingAgrupado(pstmt, 1, busqueda, null);
+            pstmt.setInt(i++, limit);
+            pstmt.setInt(i, offset);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Herramienta h = new Herramienta(rs.getInt("id"), rs.getString("nombre"),
+                        rs.getString("categoria"), rs.getInt("stock"), null, 1);
+                    h.setTipo(rs.getString("tipo"));
+                    h.setUnidad(rs.getString("unidad"));
+                    lista.add(h);
+                }
+            }
+        }
+        return lista;
     }
     
     public void crearPrestamo(Prestamo prestamo) throws SQLException {
@@ -1003,9 +1130,20 @@ public class DatabaseManager {
         connection.setAutoCommit(false);
         try {
             int prestamoId = insertarPrestamo(prestamo);
+            boolean hayRetorno = false;
             for (ItemCarrito item : items) {
-                insertarDetallePrestamo(prestamoId, item);
+                hayRetorno |= insertarDetallePrestamo(prestamoId, item);
             }
+            if (!hayRetorno) {
+                // Solo material de no retorno: se entrega y no queda nada pendiente
+                try (PreparedStatement pstmt = connection.prepareStatement(
+                        "UPDATE prestamos SET estado = 'ENTREGADO', fecha_devolucion = fecha_prestamo WHERE id = ?")) {
+                    pstmt.setInt(1, prestamoId);
+                    pstmt.executeUpdate();
+                }
+                prestamo.setEstado("ENTREGADO");
+            }
+            prestamo.setId(prestamoId);
             connection.commit();
         } catch (SQLException e) {
             connection.rollback();
@@ -1174,7 +1312,7 @@ public class DatabaseManager {
     }
 
     public int contarPrestamosPorEstadoConFiltros(String estado, String cliente, String empleado, String residente, String fechaPrestamo) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM prestamos WHERE estado = ? " +
+        String sql = "SELECT COUNT(*) FROM prestamos WHERE " + ESTADO_LISTA + " = ? " +
                 "AND (nombre_cliente LIKE ?) AND (nombre_empleado LIKE ?) AND (residente_sobrestante LIKE ?) AND (fecha_prestamo LIKE ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, estado);
@@ -1195,7 +1333,7 @@ public class DatabaseManager {
                                                                        String residente, String fechaPrestamo,
                                                                        int offset, int limit) throws SQLException {
         List<Prestamo> prestamos = new ArrayList<>();
-        String sql = "SELECT * FROM prestamos WHERE estado = ? " +
+        String sql = "SELECT * FROM prestamos WHERE " + ESTADO_LISTA + " = ? " +
                 "AND (nombre_cliente LIKE ?) AND (nombre_empleado LIKE ?) AND (residente_sobrestante LIKE ?) AND (fecha_prestamo LIKE ?) " +
                 "ORDER BY fecha_prestamo DESC LIMIT ? OFFSET ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -1232,13 +1370,16 @@ public class DatabaseManager {
         return prestamos;
     }
 
+    /** Los préstamos de puro material de no retorno (ENTREGADO) se listan con los devueltos. */
+    private static final String ESTADO_LISTA = "(CASE WHEN estado = 'ENTREGADO' THEN 'DEVUELTO' ELSE estado END)";
+
     private String safeLike(String value) {
         return value == null ? "" : value.trim();
     }
 
     public boolean tieneDevolucionesParciales(int prestamoId) throws SQLException {
         String sql = "SELECT COUNT(*) FROM detalle_prestamos " +
-                "WHERE prestamo_id = ? AND cantidad_devuelta > 0 AND cantidad_devuelta < cantidad";
+                "WHERE prestamo_id = ? AND no_retorno = 0 AND cantidad_devuelta > 0 AND cantidad_devuelta < cantidad";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, prestamoId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -1284,7 +1425,8 @@ public class DatabaseManager {
 
     public List<DetallePrestamo> obtenerDetallesPrestamo(int prestamoId) throws SQLException {
         List<DetallePrestamo> detalles = new ArrayList<>();
-        String sql = "SELECT * FROM detalle_prestamos WHERE prestamo_id = ? ORDER BY nombre_herramienta ASC";
+        String sql = "SELECT d.*, h.unidad FROM detalle_prestamos d LEFT JOIN herramientas h ON h.id = d.herramienta_id " +
+                "WHERE d.prestamo_id = ? ORDER BY d.nombre_herramienta ASC";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, prestamoId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -1296,6 +1438,8 @@ public class DatabaseManager {
                     detalle.setCategoria(rs.getString("categoria"));
                     detalle.setCantidad(rs.getInt("cantidad"));
                     detalle.setCantidadDevuelta(rs.getInt("cantidad_devuelta"));
+                    detalle.setNoRetorno(rs.getInt("no_retorno") == 1);
+                    detalle.setUnidad(rs.getString("unidad"));
                     detalles.add(detalle);
                 }
             }
@@ -1329,7 +1473,7 @@ public class DatabaseManager {
                 "JOIN detalle_prestamos d ON d.prestamo_id = p.id " +
                 "LEFT JOIN herramientas h ON h.id = d.herramienta_id " +
                 "LEFT JOIN proveedores pv ON pv.id = h.proveedor_id " +
-                "WHERE p.estado = 'PRESTADO' " +
+                "WHERE p.estado = 'PRESTADO' AND d.no_retorno = 0 " +
                 "ORDER BY p.nombre_cliente, d.nombre_herramienta";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -1358,7 +1502,7 @@ public class DatabaseManager {
         String sql = "SELECT DISTINCT d.nombre_herramienta " +
                 "FROM prestamos p " +
                 "JOIN detalle_prestamos d ON d.prestamo_id = p.id " +
-                "WHERE p.estado = 'PRESTADO' " +
+                "WHERE p.estado = 'PRESTADO' AND d.no_retorno = 0 " +
                 "ORDER BY d.nombre_herramienta ASC";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -1377,7 +1521,7 @@ public class DatabaseManager {
                 "JOIN detalle_prestamos d ON d.prestamo_id = p.id " +
                 "LEFT JOIN herramientas h ON h.id = d.herramienta_id " +
                 "LEFT JOIN proveedores pv ON pv.id = h.proveedor_id " +
-                "WHERE p.estado = 'PRESTADO' AND LOWER(TRIM(d.nombre_herramienta)) = LOWER(TRIM(?)) " +
+                "WHERE p.estado = 'PRESTADO' AND d.no_retorno = 0 AND LOWER(TRIM(d.nombre_herramienta)) = LOWER(TRIM(?)) " +
                 "ORDER BY p.nombre_cliente, p.fecha_prestamo DESC";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, herramienta);
@@ -1412,7 +1556,7 @@ public class DatabaseManager {
                 "JOIN detalle_prestamos d ON d.prestamo_id = p.id " +
                 "LEFT JOIN herramientas h ON h.id = d.herramienta_id " +
                 "LEFT JOIN proveedores pv ON pv.id = h.proveedor_id " +
-                "WHERE p.estado = 'PRESTADO' AND (d.cantidad - d.cantidad_devuelta) > 0 " +
+                "WHERE p.estado = 'PRESTADO' AND d.no_retorno = 0 AND (d.cantidad - d.cantidad_devuelta) > 0 " +
                 "AND d.nombre_herramienta LIKE ? " +
                 "ORDER BY d.nombre_herramienta ASC, p.nombre_cliente ASC";
         String pattern = "%" + (filtroMaterial == null ? "" : filtroMaterial.trim()) + "%";
@@ -1479,7 +1623,7 @@ public class DatabaseManager {
             for (DevolucionItem item : devoluciones) {
                 String sql = "UPDATE detalle_prestamos " +
                         "SET cantidad_devuelta = cantidad_devuelta + ? " +
-                        "WHERE prestamo_id = ? AND herramienta_id = ? AND (cantidad_devuelta + ?) <= cantidad";
+                        "WHERE prestamo_id = ? AND herramienta_id = ? AND no_retorno = 0 AND (cantidad_devuelta + ?) <= cantidad";
                 try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                     pstmt.setInt(1, item.getCantidadDevolver());
                     pstmt.setInt(2, prestamoId);
@@ -1535,7 +1679,8 @@ public class DatabaseManager {
     }
 
     public int obtenerPendientesPrestamo(int prestamoId) throws SQLException {
-        String sql = "SELECT SUM(cantidad - cantidad_devuelta) AS pendientes FROM detalle_prestamos WHERE prestamo_id = ?";
+        String sql = "SELECT SUM(cantidad - cantidad_devuelta) AS pendientes FROM detalle_prestamos " +
+                "WHERE prestamo_id = ? AND no_retorno = 0";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, prestamoId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -1550,7 +1695,7 @@ public class DatabaseManager {
     public void devolverPrestamo(int prestamoId) throws SQLException {
         List<DevolucionItem> devoluciones = new ArrayList<>();
         String selectSql = "SELECT herramienta_id, (cantidad - cantidad_devuelta) AS pendiente " +
-                "FROM detalle_prestamos WHERE prestamo_id = ? AND (cantidad - cantidad_devuelta) > 0";
+                "FROM detalle_prestamos WHERE prestamo_id = ? AND no_retorno = 0 AND (cantidad - cantidad_devuelta) > 0";
         try (PreparedStatement pstmt = connection.prepareStatement(selectSql)) {
             pstmt.setInt(1, prestamoId);
             try (ResultSet rs = pstmt.executeQuery()) {

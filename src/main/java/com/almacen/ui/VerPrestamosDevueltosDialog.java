@@ -374,7 +374,7 @@ public class VerPrestamosDevueltosDialog extends JDialog {
     private class EstadoRowRenderer extends InsigniaRenderer {
         @Override
         protected Tono tono(JTable table, Object value, int row) {
-            return "DEVUELTO".equals(value) ? Tono.EXITO : Tono.INFO;
+            return "DEVUELTO".equals(value) || "ENTREGADO".equals(value) ? Tono.EXITO : Tono.INFO;
         }
     }
 }

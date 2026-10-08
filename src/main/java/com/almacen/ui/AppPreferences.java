@@ -16,6 +16,7 @@ public final class AppPreferences {
     /** Carpeta de fotos usada antes de que cada base tuviera la suya; se consulta al buscar fotos antiguas. */
     private static final String KEY_LEGACY_PHOTO_FOLDER = "legacy_photo_folder_path";
     private static final String SUFIJO_FOTOS = "Fotos";
+    private static final String KEY_MAYUSCULAS = "escribir_mayusculas";
 
     private AppPreferences() {
     }
@@ -95,5 +96,14 @@ public final class AppPreferences {
             }
         }
         return actual;
+    }
+
+    /** Si está activo, todo lo que se escribe en los campos queda en MAYÚSCULAS (activo por omisión). */
+    public static boolean isMayusculas() {
+        return PREFS.getBoolean(KEY_MAYUSCULAS, true);
+    }
+
+    public static void setMayusculas(boolean activo) {
+        PREFS.putBoolean(KEY_MAYUSCULAS, activo);
     }
 }

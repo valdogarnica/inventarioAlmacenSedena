@@ -22,7 +22,8 @@ public class MainWindow extends JFrame {
     private JTable tablaHerramientas;
     private ResultadosTableModel modeloTabla;
     private JTable tablaCarrito;
-    private static final int COL_CARRITO_CANTIDAD = 3;
+    private static final int COL_CARRITO_CANTIDAD = 2;
+    private static final int COL_CARRITO_DEVOLUCION = 3;
     private DefaultTableModel modeloCarrito;
     private JButton btnQuitarCarrito;
     private JButton btnLimpiarCarrito;
@@ -54,11 +55,13 @@ public class MainWindow extends JFrame {
     private static final String PAG_CATALOGOS = "catalogos";
     private static final String PAG_REPORTES = "reportes";
     private static final String PAG_CONFIGURACION = "configuracion";
-    private static final int COL_ID = 0;
-    private static final int COL_NOMBRE = 1;
-    private static final int COL_STOCK = 6;
-    private static final int COL_CANTIDAD = 7;
-    private static final int COL_AGREGAR = 8;
+    private static final int COL_NOMBRE = 0;
+    private static final int COL_TIPO = 2;
+    private static final int COL_STOCK = 4;
+    private static final int COL_CANTIDAD = 5;
+    private static final int COL_AGREGAR = 6;
+    /** Tipos (en minúsculas) de material de no retorno, según Catálogos. */
+    private java.util.Set<String> tiposNoRetorno = new java.util.HashSet<>();
     private CardLayout cardLayout;
     private JPanel panelPaginas;
     private JPanel menuLateral;
@@ -440,7 +443,7 @@ public class MainWindow extends JFrame {
         JLabel lblBuscar = new JLabel("Buscar herramienta / material:");
         panelBusqueda.add(lblBuscar, BorderLayout.WEST);
         txtBusqueda = new JTextField();
-        txtBusqueda.putClientProperty("JTextField.placeholderText", "Escriba nombre, categoría, tipo, unidad o proveedor…");
+        txtBusqueda.putClientProperty("JTextField.placeholderText", "Escriba nombre, categoría, tipo o unidad…");
         txtBusqueda.putClientProperty("JTextField.showClearButton", true);
         txtBusqueda.setToolTipText("Nombre, categoría, tipo, unidad o proveedor");
         configurarBusquedaEnVivo();
@@ -460,8 +463,8 @@ public class MainWindow extends JFrame {
         tablaHerramientas.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaHerramientas.getTableHeader().setReorderingAllowed(false);
         tablaHerramientas.setRowHeight(32);
-        tablaHerramientas.getColumnModel().getColumn(COL_ID).setPreferredWidth(45);
-        tablaHerramientas.getColumnModel().getColumn(COL_NOMBRE).setPreferredWidth(200);
+        tablaHerramientas.getColumnModel().getColumn(COL_NOMBRE).setPreferredWidth(240);
+        tablaHerramientas.getColumnModel().getColumn(COL_TIPO).setPreferredWidth(150);
         tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setPreferredWidth(90);
         tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setMinWidth(80);
         tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setPreferredWidth(80);
@@ -473,8 +476,14 @@ public class MainWindow extends JFrame {
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaHerramientas);
         DefaultTableCellRenderer centerRenderer = UIStyles.createCenteredNumberRenderer();
-        tablaHerramientas.getColumnModel().getColumn(COL_ID).setCellRenderer(centerRenderer);
         tablaHerramientas.getColumnModel().getColumn(COL_STOCK).setCellRenderer(centerRenderer);
+        tablaHerramientas.getColumnModel().getColumn(COL_TIPO).setCellRenderer(new InsigniaRenderer() {
+            @Override
+            protected Tono tono(JTable table, Object value, int row) {
+                Herramienta h = modeloTabla.getHerramientaAt(row);
+                return h != null && esNoRetorno(h) ? Tono.AVISO : null;
+            }
+        });
         JScrollPane scrollHerramientas = new JScrollPane(tablaHerramientas);
 
         JPanel cardResultados = UIStyles.createCard("Resultados", scrollHerramientas);
@@ -513,7 +522,7 @@ public class MainWindow extends JFrame {
         JPanel panelDerecho = new JPanel(new BorderLayout(12, 12));
         panelDerecho.setOpaque(false);
         
-        String[] columnasCarrito = {"Nombre", "Proveedor", "Unidad", "Cantidad", "Stock"};
+        String[] columnasCarrito = {"Nombre", "Unidad", "Cantidad", "Devolución"};
         modeloCarrito = new DefaultTableModel(columnasCarrito, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -539,12 +548,21 @@ public class MainWindow extends JFrame {
         tablaCarrito.setRowHeight(32);
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaCarrito);
-        DefaultTableCellRenderer centerRendererCarrito = UIStyles.createCenteredNumberRenderer();
         tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setCellRenderer(new CantidadSpinnerRenderer());
         tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setCellEditor(new CantidadCarritoEditor());
-        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setPreferredWidth(90);
-        tablaCarrito.getColumnModel().getColumn(4).setCellRenderer(centerRendererCarrito);
-        tablaCarrito.getColumnModel().getColumn(4).setPreferredWidth(55);
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setPreferredWidth(85);
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_CANTIDAD).setMinWidth(80);
+        tablaCarrito.getColumnModel().getColumn(0).setPreferredWidth(150);
+        tablaCarrito.getColumnModel().getColumn(1).setPreferredWidth(70);
+        tablaCarrito.getColumnModel().getColumn(1).setMinWidth(62);
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_DEVOLUCION).setPreferredWidth(110);
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_DEVOLUCION).setMinWidth(105);
+        tablaCarrito.getColumnModel().getColumn(COL_CARRITO_DEVOLUCION).setCellRenderer(new InsigniaRenderer() {
+            @Override
+            protected Tono tono(JTable table, Object value, int row) {
+                return row < carrito.size() && esNoRetorno(carrito.get(row).getHerramienta()) ? Tono.AVISO : Tono.INFO;
+            }
+        });
         tablaCarrito.setToolTipText("Cambie la cantidad con las flechas; no puede pasar del stock del material");
         JScrollPane scrollCarrito = new JScrollPane(tablaCarrito);
         JPanel cardCarrito = UIStyles.createCard("Herramientas seleccionadas", scrollCarrito);
@@ -643,6 +661,7 @@ public class MainWindow extends JFrame {
         grid.add(tarjetaAccion("Empleado en turno",
             "Cambiar el nombre del empleado que registra préstamos y recibe remisiones.",
             "Cambiar", "/icons/edit.svg", this::configurarEmpleado));
+        grid.add(tarjetaMayusculas());
         grid.add(tarjetaAccion("Salir",
             "Cerrar el sistema.",
             "Salir", "/icons/cancel.svg", () -> System.exit(0)));
@@ -650,6 +669,27 @@ public class MainWindow extends JFrame {
         pagina.setOpaque(false);
         pagina.add(grid, BorderLayout.NORTH);
         return pagina;
+    }
+
+    /** Tarjeta con la casilla para escribir todo en mayúsculas. */
+    private JPanel tarjetaMayusculas() {
+        JPanel cuerpo = new JPanel(new BorderLayout(8, 12));
+        cuerpo.setOpaque(false);
+        JComponent lbl = UIStyles.textoAjustable(
+            "Cuando está activa, todo lo que se escribe en los campos queda en MAYÚSCULAS.");
+        UIStyles.textoSecundario(lbl);
+        cuerpo.add(lbl, BorderLayout.CENTER);
+        javax.swing.JCheckBox casilla = new javax.swing.JCheckBox("Escribir todo en MAYÚSCULAS",
+            AppPreferences.isMayusculas());
+        casilla.setOpaque(false);
+        casilla.addActionListener(e -> {
+            AppPreferences.setMayusculas(casilla.isSelected());
+            Notificaciones.exito(this, casilla.isSelected()
+                ? "Desde ahora los campos se escriben en mayúsculas."
+                : "Los campos aceptan mayúsculas y minúsculas.");
+        });
+        cuerpo.add(casilla, BorderLayout.SOUTH);
+        return UIStyles.createCard("Escritura en mayúsculas", cuerpo);
     }
 
     private JPanel tarjetaAccion(String titulo, String descripcion, String textoBoton, String icono, Runnable accion) {
@@ -730,7 +770,8 @@ public class MainWindow extends JFrame {
             }
             
             int tamano = (Integer) comboTamanoPagina.getSelectedItem();
-            totalRegistros = dbManager.contarHerramientasBusqueda(busqueda);
+            tiposNoRetorno = dbManager.obtenerTiposNoRetorno();
+            totalRegistros = dbManager.contarMaterialesPrestables(busqueda);
             int totalPaginas = (int) Math.ceil(totalRegistros / (double) tamano);
             if (totalPaginas == 0) {
                 totalPaginas = 1;
@@ -738,7 +779,8 @@ public class MainWindow extends JFrame {
             paginaActual = Math.max(1, Math.min(pagina, totalPaginas));
             int offset = (paginaActual - 1) * tamano;
             
-            List<Herramienta> herramientas = dbManager.buscarHerramientasPaginadas(busqueda, offset, tamano);
+            // El mismo material de varios proveedores sale una vez, con el stock sumado
+            List<Herramienta> herramientas = dbManager.buscarMaterialesPrestables(busqueda, offset, tamano);
             modeloTabla.setDatos(herramientas);
             
             lblPagina.setText("Página " + paginaActual + " de " + totalPaginas + " (Total: " + totalRegistros + ")");
@@ -876,10 +918,9 @@ public class MainWindow extends JFrame {
         for (ItemCarrito item : carrito) {
             modeloCarrito.addRow(new Object[]{
                 item.getNombre(),
-                item.getProveedorNombre() != null ? item.getProveedorNombre() : "-",
                 item.getUnidad(),
                 item.getCantidad(),
-                item.getHerramienta().getStock()
+                esNoRetorno(item.getHerramienta()) ? "No retorno" : "Se devuelve"
             });
         }
     }
@@ -910,8 +951,13 @@ public class MainWindow extends JFrame {
         }
     }
 
+    /** Material de no retorno: su tipo está marcado así en Catálogos (por omisión, "Material"). */
+    private boolean esNoRetorno(Herramienta h) {
+        return h.getTipo() != null && tiposNoRetorno.contains(h.getTipo().trim().toLowerCase());
+    }
+
     private class ResultadosTableModel extends AbstractTableModel {
-        private final String[] columnas = {"ID", "Nombre", "Categoría", "Tipo", "Unidad", "Proveedor", "Stock", "Cantidad", "Agregar"};
+        private final String[] columnas = {"Nombre", "Categoría", "Tipo", "Unidad", "Stock", "Cantidad", "Agregar"};
         private List<Herramienta> datos = new ArrayList<>();
         private List<Integer> cantidades = new ArrayList<>();
 
@@ -957,18 +1003,14 @@ public class MainWindow extends JFrame {
         public Object getValueAt(int rowIndex, int columnIndex) {
             Herramienta h = datos.get(rowIndex);
             switch (columnIndex) {
-                case 0:
-                    return h.getId();
-                case 1:
+                case COL_NOMBRE:
                     return h.getNombre();
-                case 2:
+                case 1:
                     return h.getCategoria();
+                case COL_TIPO:
+                    return esNoRetorno(h) ? h.getTipo() + " · no retorno" : h.getTipo();
                 case 3:
-                    return h.getTipo();
-                case 4:
                     return h.getUnidad();
-                case 5:
-                    return h.getProveedorNombre() != null ? h.getProveedorNombre() : "-";
                 case COL_STOCK:
                     return h.getStock();
                 case COL_CANTIDAD:
@@ -1008,7 +1050,7 @@ public class MainWindow extends JFrame {
 
         @Override
         public Class<?> getColumnClass(int columnIndex) {
-            if (columnIndex == COL_ID || columnIndex == COL_STOCK || columnIndex == COL_CANTIDAD) {
+            if (columnIndex == COL_STOCK || columnIndex == COL_CANTIDAD) {
                 return Integer.class;
             }
             return String.class;

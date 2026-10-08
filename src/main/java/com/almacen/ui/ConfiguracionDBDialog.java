@@ -61,6 +61,7 @@ public class ConfiguracionDBDialog extends JDialog {
         gbc.weightx = 1.0;
         txtRutaCarpeta = new JTextField(30);
         txtRutaCarpeta.setEditable(false);
+        txtRutaCarpeta.putClientProperty(Mayusculas.EXCLUIR, true);
         panelPrincipal.add(txtRutaCarpeta, gbc);
         gbc.gridx = 2;
         gbc.fill = GridBagConstraints.NONE;

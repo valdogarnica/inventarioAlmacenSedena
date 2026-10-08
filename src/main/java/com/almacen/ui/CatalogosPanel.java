@@ -39,6 +39,9 @@ public class CatalogosPanel extends JPanel implements Pagina {
         private final JList<String> lista = new JList<>(modelo);
         private final JTextField txtNuevo = new JTextField();
         private final JTextField txtRenombrar = new JTextField();
+        /** Solo en Tipos: los tipos marcados son material de no retorno. */
+        private final JCheckBox chkNoRetorno = new JCheckBox("Material de no retorno (no se devuelve)");
+        private java.util.Set<String> noRetorno = new java.util.HashSet<>();
 
         ListaCatalogo(Catalogo catalogo) {
             super(new BorderLayout(8, 8));
@@ -49,9 +52,35 @@ public class CatalogosPanel extends JPanel implements Pagina {
                 if (!e.getValueIsAdjusting() && lista.getSelectedValue() != null) {
                     txtRenombrar.setText(lista.getSelectedValue());
                 }
+                actualizarCasilla();
             });
-            lista.setFixedCellHeight(26);
-            add(UIStyles.createCard(catalogo.getPlural(), new JScrollPane(lista)), BorderLayout.CENTER);
+            lista.setFixedCellHeight(28);
+            JComponent contenido = new JScrollPane(lista);
+            if (catalogo == Catalogo.TIPOS) {
+                lista.setCellRenderer(new DefaultListCellRenderer() {
+                    @Override
+                    public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                                  boolean isSelected, boolean cellHasFocus) {
+                        super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                        if (value != null && noRetorno.contains(value.toString().trim().toLowerCase())) {
+                            setText(value + "  ·  no retorno");
+                        }
+                        return this;
+                    }
+                });
+                chkNoRetorno.setOpaque(false);
+                chkNoRetorno.setToolTipText("El material de este tipo sale con el préstamo y no se espera de regreso");
+                chkNoRetorno.addActionListener(e -> cambiarNoRetorno());
+                JPanel conCasilla = new JPanel(new BorderLayout(0, 8));
+                conCasilla.setOpaque(false);
+                conCasilla.add(contenido, BorderLayout.CENTER);
+                conCasilla.add(chkNoRetorno, BorderLayout.SOUTH);
+                contenido.putClientProperty("FlatLaf.style", "border: 1,1,1,1,$App.border,1,8");
+                add(UIStyles.createCard(catalogo.getPlural(), conCasilla), BorderLayout.CENTER);
+                actualizarCasilla();
+            } else {
+                add(UIStyles.createCard(catalogo.getPlural(), contenido), BorderLayout.CENTER);
+            }
 
             JPanel sur = new JPanel(new GridLayout(2, 1, 6, 6));
             sur.setOpaque(false);
@@ -86,6 +115,9 @@ public class CatalogosPanel extends JPanel implements Pagina {
                     return;
                 }
                 List<String> valores = db.obtenerCatalogo(catalogo);
+                if (catalogo == Catalogo.TIPOS) {
+                    noRetorno = db.obtenerTiposNoRetorno();
+                }
                 modelo.clear();
                 for (String v : valores) {
                     modelo.addElement(v);
@@ -93,6 +125,26 @@ public class CatalogosPanel extends JPanel implements Pagina {
             } catch (Exception e) {
                 Notificaciones.showMessageDialog(this, "Error al cargar " + catalogo.getPlural().toLowerCase() + ": " + e.getMessage(),
                     "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private void actualizarCasilla() {
+            String seleccion = lista.getSelectedValue();
+            chkNoRetorno.setEnabled(seleccion != null);
+            chkNoRetorno.setSelected(seleccion != null && noRetorno.contains(seleccion.trim().toLowerCase()));
+        }
+
+        private void cambiarNoRetorno() {
+            String seleccion = lista.getSelectedValue();
+            if (seleccion == null) {
+                return;
+            }
+            try {
+                DatabaseManager.getInstance().setTipoNoRetorno(seleccion, chkNoRetorno.isSelected());
+                cargar();
+                lista.setSelectedValue(seleccion, true);
+            } catch (Exception e) {
+                Notificaciones.showMessageDialog(this, "Error: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
 

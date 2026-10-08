@@ -125,7 +125,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         JPanel panelResumen = new JPanel(new BorderLayout());
         panelResumen.setOpaque(false);
         
-        String[] columnas = {"Nombre", "Categoría", "Cantidad"};
+        String[] columnas = {"Nombre", "Categoría", "Cantidad", "Devolución"};
         modeloResumen = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -140,13 +140,28 @@ public class ConfirmarPrestamoDialog extends JDialog {
         DefaultTableCellRenderer centerRenderer = UIStyles.createCenteredNumberRenderer();
         tablaResumen.getColumnModel().getColumn(2).setCellRenderer(centerRenderer); // Cantidad
         
+        java.util.Set<String> noRetorno = new java.util.HashSet<>();
+        try {
+            noRetorno = DatabaseManager.getInstance().obtenerTiposNoRetorno();
+        } catch (Exception ignored) {
+            // Sin la lista se muestran todos como de retorno; al guardar se usa la base
+        }
         for (ItemCarrito item : items) {
+            String tipo = item.getHerramienta().getTipo();
+            boolean sinRetorno = tipo != null && noRetorno.contains(tipo.trim().toLowerCase());
             modeloResumen.addRow(new Object[]{
                 item.getNombre(),
                 item.getCategoria(),
-                item.getCantidad()
+                item.getCantidad(),
+                sinRetorno ? "No retorno" : "Se devuelve"
             });
         }
+        tablaResumen.getColumnModel().getColumn(3).setCellRenderer(new InsigniaRenderer() {
+            @Override
+            protected Tono tono(JTable table, Object value, int row) {
+                return "No retorno".equals(value) ? Tono.AVISO : Tono.INFO;
+            }
+        });
         
         JScrollPane scrollResumen = new JScrollPane(tablaResumen);
         panelResumen.add(scrollResumen, BorderLayout.CENTER);
@@ -245,8 +260,8 @@ public class ConfirmarPrestamoDialog extends JDialog {
             
             // Verificar stocks antes de confirmar
             for (ItemCarrito item : items) {
-                com.almacen.model.Herramienta h = dbManager.obtenerHerramientaPorId(item.getIdHerramienta());
-                if (h == null || h.getStock() < item.getCantidad()) {
+                // El stock es la suma de todos los proveedores del material
+                if (dbManager.obtenerStockMaterial(item.getNombre(), item.getUnidad()) < item.getCantidad()) {
                     Notificaciones.showMessageDialog(this, 
                         "No hay suficiente stock para: " + item.getNombre(), 
                         "Error", JOptionPane.ERROR_MESSAGE);
@@ -289,8 +304,10 @@ public class ConfirmarPrestamoDialog extends JDialog {
 
             dbManager.crearPrestamoConDetalles(prestamo, items);
             
-            Notificaciones.showMessageDialog(this, 
-                "Préstamo realizado exitosamente", 
+            Notificaciones.showMessageDialog(this,
+                "ENTREGADO".equals(prestamo.getEstado())
+                    ? "Material entregado. Es de no retorno, así que el préstamo queda cerrado."
+                    : "Préstamo realizado exitosamente",
                 "Éxito", JOptionPane.INFORMATION_MESSAGE);
             
             prestamoConfirmado = true;

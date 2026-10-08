@@ -29,6 +29,9 @@ public abstract class InsigniaRenderer extends DefaultTableCellRenderer {
     @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
             boolean hasFocus, int row, int column) {
+        // DefaultTableCellRenderer guarda el color que se le pone y lo usaría en las celdas
+        // siguientes: se borra para que las celdas sin insignia tomen el color de la tabla
+        setForeground(null);
         super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         setHorizontalAlignment(SwingConstants.CENTER);
         try {

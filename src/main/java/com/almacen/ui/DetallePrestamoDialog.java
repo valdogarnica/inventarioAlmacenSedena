@@ -60,16 +60,26 @@ public class DetallePrestamoDialog extends JDialog {
                     "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            List<DetallePrestamo> detalles = dbManager.obtenerDetallesPrestamo(prestamoId);
+            List<DetallePrestamo> detalles = DetallePrestamo.agrupar(dbManager.obtenerDetallesPrestamo(prestamoId));
             java.util.Map<Integer, String> observaciones = dbManager.obtenerObservacionesPrestamo(prestamoId);
             modelo.setRowCount(0);
             for (DetallePrestamo d : detalles) {
-                String obs = observaciones.getOrDefault(d.getHerramientaId(), "");
+                java.util.Set<String> notas = new java.util.LinkedHashSet<>();
+                for (DetallePrestamo parte : d.getPartes()) {
+                    String nota = observaciones.get(parte.getHerramientaId());
+                    if (nota != null && !nota.isEmpty()) {
+                        notas.add(nota);
+                    }
+                }
+                String obs = String.join("; ", notas);
+                if (d.isNoRetorno()) {
+                    obs = obs.isEmpty() ? "Material de no retorno (entregado)" : obs;
+                }
                 modelo.addRow(new Object[]{
                     d.getNombreHerramienta(),
                     d.getCategoria(),
                     d.getCantidad(),
-                    d.getCantidadDevuelta(),
+                    d.isNoRetorno() ? "No retorno" : String.valueOf(d.getCantidadDevuelta()),
                     d.getPendiente(),
                     obs
                 });

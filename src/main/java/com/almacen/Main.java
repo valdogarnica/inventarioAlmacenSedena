@@ -8,6 +8,7 @@ import javax.imageio.ImageIO;
 public class Main {
     public static void main(String[] args) {
         configurarTema();
+        com.almacen.ui.Mayusculas.instalar();
         
         // Configurar estilo de Swing
         SwingUtilities.invokeLater(() -> {

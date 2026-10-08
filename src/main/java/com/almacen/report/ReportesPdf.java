@@ -1,9 +1,11 @@
 package com.almacen.report;
 
 import com.almacen.database.DatabaseManager;
+import com.almacen.model.DetallePrestamo;
 import com.almacen.model.DetalleRemision;
 import com.almacen.model.ExistenciaMaterial;
 import com.almacen.model.Herramienta;
+import com.almacen.model.Prestamo;
 import com.almacen.model.Proveedor;
 import com.almacen.model.Remision;
 import com.almacen.model.ReportePrestamoItem;
@@ -161,6 +163,81 @@ public final class ReportesPdf {
                 new String[]{"", "TOTAL", "", "", "", String.valueOf(total)});
             pdf.firmas("Entrega: " + guion(r.getEnvia()), "Recibe: " + guion(r.getRecibe()));
             return pdf.guardarTemporal("remision_" + remisionId + "_");
+        }
+    }
+
+    /**
+     * Comprobante de devolución de un préstamo. {@code devueltoAhora} y {@code observaciones}
+     * van en el mismo orden que {@code detalles}; con {@code vistaPrevia} se marca que la
+     * devolución todavía no se registra.
+     */
+    public static File comprobanteDevolucion(Prestamo p, List<DetallePrestamo> detalles, List<Integer> devueltoAhora,
+                                             List<String> observaciones, boolean vistaPrevia) throws Exception {
+        String titulo = vistaPrevia ? "COMPROBANTE DE DEVOLUCIÓN (VISTA PREVIA)" : "COMPROBANTE DE DEVOLUCIÓN";
+        try (PdfReportBuilder pdf = new PdfReportBuilder(titulo, false)) {
+            List<String[]> filas = new ArrayList<>();
+            List<String[]> entregado = new ArrayList<>();
+            int totPrestado = 0;
+            int totAntes = 0;
+            int totAhora = 0;
+            int totPendiente = 0;
+            int item = 1;
+            for (int i = 0; i < detalles.size(); i++) {
+                DetallePrestamo d = detalles.get(i);
+                if (d.isNoRetorno()) {
+                    entregado.add(new String[]{safe(d.getNombreHerramienta()), guion(d.getUnidad()),
+                        String.valueOf(d.getCantidad())});
+                    continue;
+                }
+                int ahora = devueltoAhora != null && i < devueltoAhora.size() ? devueltoAhora.get(i) : 0;
+                int pendiente = Math.max(0, d.getPendiente() - ahora);
+                String obs = observaciones != null && i < observaciones.size() ? safe(observaciones.get(i)) : "";
+                filas.add(new String[]{
+                    String.valueOf(item++),
+                    safe(d.getNombreHerramienta()),
+                    guion(d.getUnidad()),
+                    String.valueOf(d.getCantidad()),
+                    String.valueOf(d.getCantidadDevuelta()),
+                    String.valueOf(ahora),
+                    String.valueOf(pendiente),
+                    obs.isEmpty() ? "-" : obs
+                });
+                totPrestado += d.getCantidad();
+                totAntes += d.getCantidadDevuelta();
+                totAhora += ahora;
+                totPendiente += pendiente;
+            }
+            String resultado = totPendiente == 0 ? "Devolución completa"
+                : (totPendiente == 1 ? "Devolución parcial: queda 1 pendiente" : "Devolución parcial: quedan " + totPendiente + " pendientes");
+            pdf.datos(new String[][]{
+                {"Préstamo", String.valueOf(p.getId())},
+                {"Folio de autorización", p.isAutorizacion() ? guion(p.getFolio()) : "Sin autorización"},
+                {"Cliente", safe(p.getNombreCliente())},
+                {"Residente/Sobrestante", guion(p.getResidenteSobrestante())},
+                {"Prestó", guion(p.getNombreEmpleado())},
+                {"Fecha del préstamo", p.getFechaPrestamo() != null ? p.getFechaPrestamo().format(FECHA_HORA) : ""},
+                {"Fecha de devolución", LocalDateTime.now().format(FECHA_HORA)},
+                {"Resultado", resultado}
+            }, 2);
+            pdf.espacio(6);
+            pdf.subtitulo("Herramientas devueltas");
+            pdf.tabla(new String[]{"#", "Herramienta", "Unidad", "Prestado", "Ya devuelto", "Devuelve hoy",
+                    "Pendiente", "Observación"},
+                new float[]{3, 17, 7, 8, 10, 12, 9, 18},
+                new boolean[]{true, false, false, true, true, true, true, false},
+                filas,
+                new String[]{"", "TOTAL", "", String.valueOf(totPrestado), String.valueOf(totAntes),
+                    String.valueOf(totAhora), String.valueOf(totPendiente), ""});
+            if (!entregado.isEmpty()) {
+                pdf.espacio(8);
+                pdf.subtitulo("Material de no retorno entregado con el préstamo (no se devuelve)");
+                pdf.tabla(new String[]{"Material", "Unidad", "Cantidad"},
+                    new float[]{30, 10, 8},
+                    new boolean[]{false, false, true},
+                    entregado, null);
+            }
+            pdf.firmas("Entrega: " + safe(p.getNombreCliente()), "Recibe (almacén)");
+            return pdf.guardarTemporal("comprobante_devolucion_" + p.getId() + "_");
         }
     }
 
