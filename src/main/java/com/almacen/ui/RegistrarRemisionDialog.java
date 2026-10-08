@@ -7,7 +7,6 @@ import com.almacen.model.Herramienta;
 import com.almacen.model.Proveedor;
 import com.almacen.model.Remision;
 import com.almacen.report.ReportesPdf;
-import com.toedter.calendar.JDateChooser;
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -38,7 +37,7 @@ public class RegistrarRemisionDialog extends JDialog {
 
     private final String empleado;
     private final JTextField txtNumero = new JTextField(16);
-    private final JDateChooser dateFecha = new JDateChooser();
+    private final SelectorFecha dateFecha = new SelectorFecha();
     private ProveedorSelector selProveedor;
     private final JTextField txtObra = new JTextField(16);
     private final JTextField txtEnvia = new JTextField(16);
@@ -93,14 +92,13 @@ public class RegistrarRemisionDialog extends JDialog {
         setSize(1180, 720);
         setLocationRelativeTo(getOwner());
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         // ---------- Encabezado
         selProveedor = new ProveedorSelector(false, true);
         selProveedor.getCombo().addActionListener(e -> cargarMaterialesProveedor());
         dateFecha.setDateFormatString("dd/MM/yyyy");
         dateFecha.setDate(new Date());
-        dateFecha.setPreferredSize(new Dimension(150, 30));
+        dateFecha.setPermiteVacia(false);
         if (empleado != null) {
             txtRecibe.setText(empleado);
         }
@@ -177,7 +175,7 @@ public class RegistrarRemisionDialog extends JDialog {
         accionesFilas.add(btnAgregarFila);
         accionesFilas.add(btnQuitarFila);
         JLabel ayuda = new JLabel("  Elija un material ya registrado (de cualquier proveedor) para que se sume a su total, o escriba uno nuevo. Las filas vacías se ignoran.");
-        ayuda.setForeground(new Color(110, 120, 140));
+        UIStyles.textoSecundario(ayuda);
         accionesFilas.add(ayuda);
         panelPartidas.add(accionesFilas, BorderLayout.SOUTH);
         add(UIStyles.createCard("Materiales recibidos (elementos)", panelPartidas), BorderLayout.CENTER);
@@ -186,14 +184,13 @@ public class RegistrarRemisionDialog extends JDialog {
         JPanel sur = new JPanel(new BorderLayout());
         sur.setOpaque(false);
         lblResumen = new JLabel();
-        lblResumen.setForeground(UIStyles.TEXT);
         lblResumen.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
         sur.add(lblResumen, BorderLayout.WEST);
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         botones.setOpaque(false);
         btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         UIStyles.applySvgIcon(btnCancelar, "/icons/cancel.svg", 16);
         btnGuardar = new JButton("Guardar remisión");
         btnGuardar.addActionListener(e -> guardar());
@@ -300,9 +297,6 @@ public class RegistrarRemisionDialog extends JDialog {
             }
         }
         dateFecha.setEnabled(valor);
-        // JDateChooser no recupera el fondo normal al volver a habilitarse
-        dateFecha.getDateEditor().getUiComponent().setBackground(
-            UIManager.getColor(valor ? "TextField.background" : "TextField.disabledBackground"));
         for (Component c : selProveedor.getComponents()) {
             c.setEnabled(valor);
         }
@@ -330,7 +324,6 @@ public class RegistrarRemisionDialog extends JDialog {
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
         JLabel lbl = new JLabel(etiqueta);
-        lbl.setForeground(UIStyles.TEXT);
         panel.add(lbl, gbc);
         gbc.gridx = x + 1;
         gbc.gridwidth = ancho;
@@ -478,11 +471,10 @@ public class RegistrarRemisionDialog extends JDialog {
             DatabaseManager db = DatabaseManager.getInstance();
             String numero = txtNumero.getText().trim();
             if (remisionId == null && db.existeRemision(numero, proveedor.getId())) {
-                int r = JOptionPane.showConfirmDialog(this,
+                if (!Alerta.confirmar(this,
                     "Ya se registró la remisión \"" + numero + "\" de " + proveedor.getNombre() +
-                        ".\n¿Desea registrarla de nuevo? Las cantidades se sumarán otra vez al stock.",
-                    "Remisión repetida", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-                if (r != JOptionPane.YES_OPTION) {
+                        ". ¿Desea registrarla de nuevo? Las cantidades se sumarán otra vez al stock.",
+                    "Remisión repetida", Alerta.Tipo.AVISO, "Registrar de nuevo", "Cancelar")) {
                     return;
                 }
             }
@@ -508,11 +500,10 @@ public class RegistrarRemisionDialog extends JDialog {
             int id = db.registrarRemision(remision, partidas);
             guardado = true;
 
-            int r = JOptionPane.showConfirmDialog(this,
-                "Remisión registrada (folio interno " + id + ") con " + partidas.size() + " materiales.\n" +
+            if (Alerta.confirmar(this,
+                "Remisión registrada (folio interno " + id + ") con " + partidas.size() + " materiales. " +
                     "¿Desea abrir el comprobante en PDF?",
-                "Remisión guardada", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
-            if (r == JOptionPane.YES_OPTION) {
+                "Remisión guardada", Alerta.Tipo.EXITO, "Abrir PDF", "Ahora no")) {
                 PdfViewer.generarYAbrir(getOwner(), () -> ReportesPdf.remision(id), "No se encontró la remisión");
             }
             dispose();
@@ -705,9 +696,9 @@ public class RegistrarRemisionDialog extends JDialog {
             String texto = value != null ? value.toString() : "";
             if (!isSelected) {
                 if (texto.startsWith("Existente")) {
-                    c.setForeground(new Color(30, 120, 60));
+                    c.setForeground(Tema.color("App.successText"));
                 } else if (texto.startsWith("Nuevo")) {
-                    c.setForeground(new Color(45, 108, 223));
+                    c.setForeground(Tema.color("App.accentSoftText"));
                 } else {
                     c.setForeground(table.getForeground());
                 }

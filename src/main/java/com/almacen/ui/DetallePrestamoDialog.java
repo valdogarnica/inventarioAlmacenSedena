@@ -24,7 +24,6 @@ public class DetallePrestamoDialog extends JDialog {
         setSize(800, 500);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         String[] columnas = {"Herramienta", "Categoría", "Prestado", "Devuelto", "Pendiente", "Observaciones"};
         modelo = new DefaultTableModel(columnas, 0) {
@@ -45,7 +44,7 @@ public class DetallePrestamoDialog extends JDialog {
 
         JButton btnCerrar = new JButton("Cerrar");
         btnCerrar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCerrar);
+        UIStyles.styleSecondaryButton(btnCerrar);
         JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelBotones.setOpaque(false);
         panelBotones.add(btnCerrar);

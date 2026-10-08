@@ -62,7 +62,7 @@ public final class ComboBuscable {
             // Sin icono si no se encuentra
         }
         JLabel conteo = new JLabel();
-        conteo.setForeground(new Color(110, 120, 135));
+        conteo.setForeground(Tema.color("App.muted"));
         conteo.setFont(conteo.getFont().deriveFont(11f));
 
         JPanel barra = new JPanel(new BorderLayout(6, 0));
@@ -74,7 +74,7 @@ public final class ComboBuscable {
             modelo.filtrar(campo.getText());
             conteo.setText(modelo.getSize() == 0 && !campo.getText().isEmpty()
                 ? "Sin resultados" : modelo.getSize() + "/" + modelo.getTotal());
-            conteo.setForeground(modelo.getSize() == 0 ? new Color(200, 60, 60) : new Color(110, 120, 135));
+            conteo.setForeground(Tema.color(modelo.getSize() == 0 ? "App.dangerText" : "App.muted"));
             JList<?> lista = lista(combo);
             if (lista != null && modelo.getSize() > 0) {
                 int i = modelo.indiceDe(combo.getSelectedItem());
@@ -84,7 +84,11 @@ public final class ComboBuscable {
         };
 
         insertarBarra(combo, barra);
-        combo.addPropertyChangeListener("UI", e -> SwingUtilities.invokeLater(() -> insertarBarra(combo, barra)));
+        combo.addPropertyChangeListener("UI", e -> SwingUtilities.invokeLater(() -> {
+            // La barra quedó fuera del árbol al cambiar de tema: se actualiza con el tema nuevo
+            SwingUtilities.updateComponentTreeUI(barra);
+            insertarBarra(combo, barra);
+        }));
 
         // Escribir no salta a la opción que empieza con la letra: alimenta la búsqueda
         combo.setKeySelectionManager((key, model) -> -1);
@@ -132,7 +136,7 @@ public final class ComboBuscable {
                 campo.setText("");
                 modelo.filtrar("");
                 conteo.setText(modelo.getTotal() + " opciones");
-                conteo.setForeground(new Color(110, 120, 135));
+                conteo.setForeground(Tema.color("App.muted"));
             }
 
             @Override
@@ -177,11 +181,35 @@ public final class ComboBuscable {
     // ---------------------------------------------------------------- combo editable
 
     private static <E> void instalarEditable(JComboBox<E> combo, ModeloFiltrable<E> modelo) {
-        Component editor = combo.getEditor().getEditorComponent();
-        if (!(editor instanceof JTextField)) {
+        conectarEditor(combo, modelo);
+        // Al cambiar de tema (claro/oscuro) Swing crea un editor nuevo: se vuelve a conectar
+        combo.addPropertyChangeListener("editor", e -> conectarEditor(combo, modelo));
+        combo.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+            }
+
+            @Override
+            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                Component editor = combo.getEditor() != null ? combo.getEditor().getEditorComponent() : null;
+                if (editor instanceof JTextField) {
+                    SwingUtilities.invokeLater(() -> filtrarConservandoTexto(combo, modelo, (JTextField) editor, ""));
+                }
+            }
+
+            @Override
+            public void popupMenuCanceled(PopupMenuEvent e) {
+            }
+        });
+    }
+
+    private static <E> void conectarEditor(JComboBox<E> combo, ModeloFiltrable<E> modelo) {
+        Component editor = combo.getEditor() != null ? combo.getEditor().getEditorComponent() : null;
+        if (!(editor instanceof JTextField) || ((JTextField) editor).getClientProperty(CLAVE) != null) {
             return;
         }
         JTextField texto = (JTextField) editor;
+        texto.putClientProperty(CLAVE, Boolean.TRUE);
         texto.addKeyListener(new KeyAdapter() {
             @Override
             public void keyReleased(KeyEvent e) {
@@ -210,20 +238,6 @@ public final class ComboBuscable {
                 } else {
                     combo.hidePopup();
                 }
-            }
-        });
-        combo.addPopupMenuListener(new PopupMenuListener() {
-            @Override
-            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-            }
-
-            @Override
-            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                SwingUtilities.invokeLater(() -> filtrarConservandoTexto(combo, modelo, texto, ""));
-            }
-
-            @Override
-            public void popupMenuCanceled(PopupMenuEvent e) {
             }
         });
     }

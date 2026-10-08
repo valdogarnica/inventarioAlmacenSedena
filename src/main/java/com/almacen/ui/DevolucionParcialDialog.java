@@ -41,7 +41,6 @@ public class DevolucionParcialDialog extends JDialog {
         setSize(1100, 750);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         modelo = new DevolucionTableModel();
         tabla = new JTable(modelo);
@@ -62,7 +61,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelCentro.setOpaque(false);
         chkEntregaCompleta = new JCheckBox("Entrega completa (devolver todo)");
         chkEntregaCompleta.setOpaque(false);
-        chkEntregaCompleta.setForeground(UIStyles.TEXT);
         chkEntregaCompleta.addActionListener(e -> aplicarEntregaCompleta());
         panelCentro.add(chkEntregaCompleta, BorderLayout.NORTH);
         panelCentro.add(scroll, BorderLayout.CENTER);
@@ -78,7 +76,7 @@ public class DevolucionParcialDialog extends JDialog {
         UIStyles.stylePrimaryButton(btnDevolver);
         btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         
        
 
@@ -91,7 +89,6 @@ public class DevolucionParcialDialog extends JDialog {
     private JPanel crearPanelInformacionPrestamo() {
         JPanel panel = new JPanel(new BorderLayout(15, 15));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        panel.setBackground(UIStyles.BG);
         
         // Panel izquierdo - Información del préstamo
         JPanel panelInfo = new JPanel(new GridBagLayout());
@@ -105,7 +102,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("ID Préstamo:"), gbc);
         gbc.gridx = 1;
         JLabel lblId = new JLabel("-");
-        lblId.setForeground(UIStyles.TEXT);
         panelInfo.add(lblId, gbc);
         
         gbc.gridx = 0;
@@ -113,7 +109,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("Cliente:"), gbc);
         gbc.gridx = 1;
         JLabel lblCliente = new JLabel("-");
-        lblCliente.setForeground(UIStyles.TEXT);
         panelInfo.add(lblCliente, gbc);
         
         gbc.gridx = 0;
@@ -121,7 +116,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("Empleado:"), gbc);
         gbc.gridx = 1;
         JLabel lblEmpleado = new JLabel("-");
-        lblEmpleado.setForeground(UIStyles.TEXT);
         panelInfo.add(lblEmpleado, gbc);
         
         gbc.gridx = 0;
@@ -129,7 +123,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("Residente/Sobrestante:"), gbc);
         gbc.gridx = 1;
         JLabel lblResidente = new JLabel("-");
-        lblResidente.setForeground(UIStyles.TEXT);
         panelInfo.add(lblResidente, gbc);
         
         gbc.gridx = 0;
@@ -137,7 +130,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("Fecha Préstamo:"), gbc);
         gbc.gridx = 1;
         JLabel lblFechaPrestamo = new JLabel("-");
-        lblFechaPrestamo.setForeground(UIStyles.TEXT);
         panelInfo.add(lblFechaPrestamo, gbc);
         
         gbc.gridx = 0;
@@ -145,7 +137,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("Folio:"), gbc);
         gbc.gridx = 1;
         JLabel lblFolio = new JLabel("-");
-        lblFolio.setForeground(UIStyles.TEXT);
         panelInfo.add(lblFolio, gbc);
         
         gbc.gridx = 0;
@@ -153,7 +144,6 @@ public class DevolucionParcialDialog extends JDialog {
         panelInfo.add(crearEtiqueta("Autorización:"), gbc);
         gbc.gridx = 1;
         JLabel lblAutorizacion = new JLabel("-");
-        lblAutorizacion.setForeground(UIStyles.TEXT);
         panelInfo.add(lblAutorizacion, gbc);
         
         // Actualizar información cuando se cargue el préstamo
@@ -172,13 +162,12 @@ public class DevolucionParcialDialog extends JDialog {
         JPanel panelFoto = new JPanel(new BorderLayout());
         panelFoto.setOpaque(false);
         JLabel lblFotoTitulo = new JLabel("Foto del préstamo:");
-        lblFotoTitulo.setForeground(UIStyles.TEXT);
         lblFotoTitulo.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
         panelFoto.add(lblFotoTitulo, BorderLayout.NORTH);
         
         JLabel lblFoto = new JLabel();
         lblFoto.setHorizontalAlignment(SwingConstants.CENTER);
-        lblFoto.setBorder(BorderFactory.createLineBorder(UIStyles.TEXT, 1));
+        lblFoto.putClientProperty("FlatLaf.style", "border: 1,1,1,1,$App.border,1,8");
         lblFoto.setPreferredSize(new Dimension(200, 200));
         lblFoto.setMinimumSize(new Dimension(200, 200));
         lblFoto.setMaximumSize(new Dimension(200, 200));
@@ -197,7 +186,6 @@ public class DevolucionParcialDialog extends JDialog {
     private JLabel crearEtiqueta(String texto) {
         JLabel label = new JLabel(texto);
         label.setFont(label.getFont().deriveFont(Font.BOLD));
-        label.setForeground(UIStyles.TEXT);
         return label;
     }
    

@@ -29,12 +29,10 @@ public class MaterialesPrestadosDialog extends JDialog {
         setSize(1150, 650);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel panelFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelFiltro.setOpaque(false);
         JLabel lblFiltro = new JLabel("Material:");
-        lblFiltro.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblFiltro);
         comboModel = new DefaultComboBoxModel<>();
         comboMaterial = new JComboBox<>(comboModel);
@@ -79,7 +77,7 @@ public class MaterialesPrestadosDialog extends JDialog {
 
         JButton btnCerrar = new JButton("Cerrar");
         btnCerrar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCerrar);
+        UIStyles.styleSecondaryButton(btnCerrar);
         JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelBotones.setOpaque(false);
         panelBotones.add(btnCerrar);

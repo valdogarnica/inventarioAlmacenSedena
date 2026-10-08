@@ -76,10 +76,7 @@ public class CatalogoSelector extends JPanel {
     }
 
     private void agregarNuevo() {
-        String nombre = JOptionPane.showInputDialog(this,
-            catalogo.getEtiquetaNuevo() + ":",
-            catalogo.getEtiquetaNuevo(),
-            JOptionPane.QUESTION_MESSAGE);
+        String nombre = Alerta.pedirTexto(this, "Escriba el nombre.", catalogo.getEtiquetaNuevo(), null);
         if (nombre == null || nombre.trim().isEmpty()) {
             return;
         }

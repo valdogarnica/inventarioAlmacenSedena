@@ -50,13 +50,11 @@ public class InventarioPanel extends JPanel implements Pagina {
         JPanel filtros = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         filtros.setOpaque(false);
         JLabel lblFiltro = new JLabel("Buscar:");
-        lblFiltro.setForeground(UIStyles.TEXT);
         filtros.add(lblFiltro);
         txtFiltro.setToolTipText("Nombre, categoría, tipo, unidad, proveedor, descripción o ID");
         txtFiltro.getDocument().addDocumentListener(new SimpleDocumentListener(() -> cargarPagina(1)));
         filtros.add(txtFiltro);
         JLabel lblProveedor = new JLabel("Proveedor:");
-        lblProveedor.setForeground(UIStyles.TEXT);
         filtros.add(lblProveedor);
         comboProveedor.setPreferredSize(new Dimension(230, 30));
         ComboBuscable.instalar(comboProveedor);
@@ -98,7 +96,6 @@ public class InventarioPanel extends JPanel implements Pagina {
         acciones.add(btnReporte);
 
         JLabel lblVista = new JLabel("   Vista:");
-        lblVista.setForeground(UIStyles.TEXT);
         ButtonGroup grupoVista = new ButtonGroup();
         grupoVista.add(btnVistaTotal);
         grupoVista.add(btnVistaDetalle);
@@ -302,10 +299,9 @@ public class InventarioPanel extends JPanel implements Pagina {
     private void darDeBaja(int fila) {
         int id = (Integer) modelo.getValueAt(fila, COL_ID);
         String nombre = String.valueOf(modelo.getValueAt(fila, 1));
-        int respuesta = JOptionPane.showConfirmDialog(this,
-            "¿Desea dar de baja \"" + nombre + "\"?", "Confirmar",
-            JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (respuesta != JOptionPane.YES_OPTION) {
+        if (!Alerta.confirmar(this, "\"" + nombre + "\" dejará de aparecer en el inventario. "
+                + "Podrá darlo de alta otra vez desde \"Dados de baja\".",
+                "¿Dar de baja este material?", Alerta.Tipo.AVISO, "Dar de baja", "Cancelar")) {
             return;
         }
         try {

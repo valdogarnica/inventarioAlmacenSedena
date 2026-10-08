@@ -4,7 +4,6 @@ import com.almacen.database.DatabaseManager;
 import com.almacen.model.Prestamo;
 import com.almacen.report.ReportesPdf;
 import javax.swing.*;
-import com.toedter.calendar.JDateChooser;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
@@ -29,7 +28,7 @@ public class VerPrestamosDialog extends JDialog {
     private JTextField txtFiltroCliente;
     private JTextField txtFiltroEmpleado;
     private JTextField txtFiltroResidente;
-    private JDateChooser dateFiltroFecha;
+    private SelectorFecha dateFiltroFecha;
     private JButton btnFiltrar;
     private JButton btnLimpiar;
     private int paginaActual = 1;
@@ -45,35 +44,28 @@ public class VerPrestamosDialog extends JDialog {
         setSize(1350, 800);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel panelFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelFiltro.setOpaque(false);
         JLabel lblCliente = new JLabel("Cliente:");
-        lblCliente.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblCliente);
         txtFiltroCliente = new JTextField(12);
         panelFiltro.add(txtFiltroCliente);
 
         JLabel lblEmpleado = new JLabel("Empleado:");
-        lblEmpleado.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblEmpleado);
         txtFiltroEmpleado = new JTextField(12);
         panelFiltro.add(txtFiltroEmpleado);
 
         JLabel lblResidente = new JLabel("Residente/Sobrestante:");
-        lblResidente.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblResidente);
         txtFiltroResidente = new JTextField(14);
         panelFiltro.add(txtFiltroResidente);
 
         JLabel lblFecha = new JLabel("Fecha préstamo:");
-        lblFecha.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblFecha);
-        dateFiltroFecha = new JDateChooser();
+        dateFiltroFecha = new SelectorFecha();
         dateFiltroFecha.setDateFormatString("yyyy-MM-dd");
-        dateFiltroFecha.setPreferredSize(new Dimension(120, 28));
-        aplicarEstiloCalendario(dateFiltroFecha);
         panelFiltro.add(dateFiltroFecha);
 
         btnFiltrar = new JButton("Filtrar");
@@ -111,7 +103,7 @@ public class VerPrestamosDialog extends JDialog {
         txtFiltroCliente.getDocument().addDocumentListener(filtroListener);
         txtFiltroEmpleado.getDocument().addDocumentListener(filtroListener);
         txtFiltroResidente.getDocument().addDocumentListener(filtroListener);
-        dateFiltroFecha.getDateEditor().addPropertyChangeListener("date", e -> cargarPagina(1));
+        dateFiltroFecha.addPropertyChangeListener("date", e -> cargarPagina(1));
         
         String[] columnas = {"ID", "Cliente", "Empleado", "Residente/Sobrestante", "Autorización", "Folio",
                              "Fecha Préstamo", "Fecha Devolución", "Días prestado", "Estado", "Foto", "Herramientas"};
@@ -176,7 +168,6 @@ public class VerPrestamosDialog extends JDialog {
         JPanel panelPaginacion = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelPaginacion.setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
-        lblTamano.setForeground(UIStyles.TEXT);
         panelPaginacion.add(lblTamano);
         comboTamanoPagina = new JComboBox<>(new Integer[]{10, 20, 50});
         comboTamanoPagina.setSelectedItem(10);
@@ -191,7 +182,6 @@ public class VerPrestamosDialog extends JDialog {
         UIStyles.styleSecondaryButton(btnSiguiente);
         panelPaginacion.add(btnSiguiente);
         lblPagina = new JLabel("Página 1 de 1");
-        lblPagina.setForeground(UIStyles.TEXT);
         panelPaginacion.add(lblPagina);
 
         JPanel panelInferior = new JPanel(new BorderLayout());
@@ -199,34 +189,6 @@ public class VerPrestamosDialog extends JDialog {
         panelInferior.add(panelPaginacion, BorderLayout.CENTER);
         panelInferior.add(panelBotones, BorderLayout.EAST);
         add(panelInferior, BorderLayout.SOUTH);
-    }
-
-    private void aplicarEstiloCalendario(JDateChooser chooser) {
-        try {
-            JButton btn = chooser.getCalendarButton();
-            btn.setPreferredSize(new Dimension(34, 28));
-            UIStyles.styleSecondaryButton(btn);
-            btn.setText("");
-        } catch (Exception ignored) {
-        }
-        try {
-            java.awt.Component editor = chooser.getDateEditor().getUiComponent();
-            if (editor instanceof JComponent) {
-                JComponent comp = (JComponent) editor;
-                comp.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-                comp.setBackground(Color.WHITE);
-                comp.setForeground(UIStyles.TEXT);
-            }
-            com.toedter.calendar.JCalendar cal = chooser.getJCalendar();
-            cal.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            cal.setBackground(Color.WHITE);
-            cal.setForeground(UIStyles.TEXT);
-            cal.getDayChooser().setDayBordersVisible(true);
-            cal.getDayChooser().setWeekdayForeground(new Color(45, 108, 223));
-            cal.getDayChooser().setSundayForeground(new Color(227, 75, 75));
-            cal.getDayChooser().setDecorationBackgroundColor(new Color(245, 247, 251));
-        } catch (Exception ignored) {
-        }
     }
 
     private void cargarPagina(int pagina) {
@@ -475,7 +437,6 @@ public class VerPrestamosDialog extends JDialog {
             setSize(520, 240);
             setLocationRelativeTo(parent);
             setLayout(new BorderLayout(10, 10));
-            getContentPane().setBackground(UIStyles.BG);
 
             JPanel panelOpciones = new JPanel(new GridBagLayout());
             panelOpciones.setOpaque(false);
@@ -577,50 +538,19 @@ public class VerPrestamosDialog extends JDialog {
         dialog.setVisible(true);
     }
 
-    private class EstadoRowRenderer extends DefaultTableCellRenderer {
+    /** Estado como insignia: amarillo si tiene devoluciones parciales, rojo si sigue prestado completo. */
+    private class EstadoRowRenderer extends InsigniaRenderer {
         @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, 
-                boolean hasFocus, int row, int column) {
-            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            setHorizontalAlignment(SwingConstants.CENTER);
-            
-            try {
-                String estado = (String) value;
-                int idPrestamo = (Integer) modelo.getValueAt(row, 0);
-                DatabaseManager dbManager = DatabaseManager.getInstance();
-                
-                if ("PRESTADO".equals(estado)) {
-                    // Verificar si tiene devoluciones parciales (incompleto)
-                    boolean incompleto = dbManager.tieneDevolucionesParciales(idPrestamo);
-                    if (incompleto) {
-                        // Amarillo para préstamos incompletos
-                        c.setBackground(new Color(255, 255, 200)); // Amarillo claro
-                    } else {
-                        // Rojo claro para préstamos prestados completos
-                        c.setBackground(new Color(255, 200, 200)); // Rojo claro
-                    }
-                    c.setForeground(Color.BLACK);
-                } else {
-                    // Color por defecto para otros estados
-                    c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                    c.setForeground(isSelected ? table.getSelectionForeground() : table.getForeground());
-                }
-                
-                if (isSelected) {
-                    Color currentBg = c.getBackground();
-                    c.setBackground(new Color(
-                        Math.max(0, currentBg.getRed() - 30),
-                        Math.max(0, currentBg.getGreen() - 30),
-                        Math.max(0, currentBg.getBlue() - 30)
-                    ));
-                }
-            } catch (Exception e) {
-                // En caso de error, mantener color por defecto
-                c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                c.setForeground(isSelected ? table.getSelectionForeground() : table.getForeground());
+        protected Tono tono(JTable table, Object value, int row) {
+            if (!"PRESTADO".equals(value)) {
+                return Tono.INFO;
             }
-            
-            return c;
+            int idPrestamo = (Integer) modelo.getValueAt(row, 0);
+            try {
+                return DatabaseManager.getInstance().tieneDevolucionesParciales(idPrestamo) ? Tono.AVISO : Tono.PELIGRO;
+            } catch (java.sql.SQLException e) {
+                return Tono.PELIGRO;
+            }
         }
     }
 }

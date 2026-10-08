@@ -50,7 +50,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         setSize(980, 700);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -69,7 +68,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         gbcCliente.gridx = 0;
         gbcCliente.gridy = 0;
         JLabel lblCliente = new JLabel("Nombre del Cliente:");
-        lblCliente.setForeground(UIStyles.TEXT);
         panelCliente.add(lblCliente, gbcCliente);
 
         gbcCliente.gridx = 1;
@@ -83,7 +81,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         gbcCliente.fill = GridBagConstraints.NONE;
         gbcCliente.weightx = 0;
         JLabel lblResidente = new JLabel("Residente o Sobrestante:");
-        lblResidente.setForeground(UIStyles.TEXT);
         panelCliente.add(lblResidente, gbcCliente);
 
         gbcCliente.gridx = 1;
@@ -97,7 +94,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         gbcCliente.fill = GridBagConstraints.NONE;
         gbcCliente.weightx = 0;
         JLabel lblAut = new JLabel("Autorización:");
-        lblAut.setForeground(UIStyles.TEXT);
         panelCliente.add(lblAut, gbcCliente);
 
         gbcCliente.gridx = 1;
@@ -110,7 +106,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         panelFolio = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         panelFolio.setOpaque(false);
         JLabel lblFolio = new JLabel("Folio:");
-        lblFolio.setForeground(UIStyles.TEXT);
         panelFolio.add(lblFolio);
         txtFolio = new JTextField(18);
         panelFolio.add(txtFolio);
@@ -160,11 +155,9 @@ public class ConfirmarPrestamoDialog extends JDialog {
         JPanel panelInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelInfo.setOpaque(false);
         JLabel lblEmpleado = new JLabel("Empleado: " + nombreEmpleado);
-        lblEmpleado.setForeground(UIStyles.TEXT);
         panelInfo.add(lblEmpleado);
         JLabel lblFecha = new JLabel("Fecha: " + LocalDateTime.now().format(
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        lblFecha.setForeground(UIStyles.TEXT);
         panelInfo.add(lblFecha);
         panelResumen.add(panelInfo, BorderLayout.SOUTH);
         
@@ -176,7 +169,6 @@ public class ConfirmarPrestamoDialog extends JDialog {
         JPanel panelSelector = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelSelector.setOpaque(false);
         JLabel lblCamara = new JLabel("Cámara:");
-        lblCamara.setForeground(UIStyles.TEXT);
         panelSelector.add(lblCamara);
         comboCamaras = new JComboBox<>();
         panelSelector.add(comboCamaras);
@@ -189,9 +181,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         cameraContainer = new JPanel(new CardLayout());
         cameraContainer.setOpaque(false);
         JLabel lblSinCamara = new JLabel("Inicie la cámara para ver el video", SwingConstants.CENTER);
-        lblSinCamara.setForeground(UIStyles.TEXT);
         lblFotoCapturada = new JLabel("Sin foto", SwingConstants.CENTER);
-        lblFotoCapturada.setForeground(UIStyles.TEXT);
         cameraContainer.add(lblSinCamara, "preview");
         cameraContainer.add(lblFotoCapturada, "foto");
         panelCamara.add(cameraContainer, BorderLayout.CENTER);
@@ -217,7 +207,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
         UIStyles.stylePrimaryButton(btnConfirmar);
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         panelBotones.add(btnCancelar);
         panelBotones.add(btnConfirmar);
         add(panelBotones, BorderLayout.SOUTH);

@@ -33,7 +33,6 @@ public class RemisionesPanel extends JPanel implements Pagina {
         JPanel filtros = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         filtros.setOpaque(false);
         JLabel lbl = new JLabel("Buscar:");
-        lbl.setForeground(UIStyles.TEXT);
         filtros.add(lbl);
         txtFiltro.setToolTipText("No. remisión, proveedor, obra, quién envía/recibe, fecha (aaaa-mm-dd) o material");
         txtFiltro.getDocument().addDocumentListener(new SimpleDocumentListener(() -> cargarPagina(1)));

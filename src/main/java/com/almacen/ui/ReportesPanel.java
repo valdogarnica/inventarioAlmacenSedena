@@ -3,7 +3,6 @@ package com.almacen.ui;
 import com.almacen.database.DatabaseManager;
 import com.almacen.model.Proveedor;
 import com.almacen.report.ReportesPdf;
-import com.toedter.calendar.JDateChooser;
 import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
@@ -16,8 +15,8 @@ import java.util.Date;
 public class ReportesPanel extends JPanel implements Pagina {
     private ProveedorSelector selProveedorInventario;
     private ProveedorSelector selProveedorEntradas;
-    private final JDateChooser dateDesde = new JDateChooser();
-    private final JDateChooser dateHasta = new JDateChooser();
+    private final SelectorFecha dateDesde = new SelectorFecha();
+    private final SelectorFecha dateHasta = new SelectorFecha();
     private final JComboBox<String> comboHerramienta = new JComboBox<>();
 
     public ReportesPanel() {
@@ -52,8 +51,8 @@ public class ReportesPanel extends JPanel implements Pagina {
         dateHasta.setDateFormatString("dd/MM/yyyy");
         dateDesde.setDate(Date.from(LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant()));
         dateHasta.setDate(new Date());
-        dateDesde.setPreferredSize(new Dimension(130, 28));
-        dateHasta.setPreferredSize(new Dimension(130, 28));
+        dateDesde.setPermiteVacia(false);
+        dateHasta.setPermiteVacia(false);
         selProveedorEntradas = new ProveedorSelector("(Todos los proveedores)", false);
         JPanel controlesEntradas = new JPanel(new GridLayout(2, 1, 4, 4));
         controlesEntradas.setOpaque(false);
@@ -104,7 +103,7 @@ public class ReportesPanel extends JPanel implements Pagina {
         contenedor.setOpaque(false);
         contenedor.add(grid, BorderLayout.NORTH);
         JScrollPane scroll = new JScrollPane(contenedor);
-        scroll.setBorder(null);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getViewport().setOpaque(false);
         scroll.setOpaque(false);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
@@ -136,7 +135,6 @@ public class ReportesPanel extends JPanel implements Pagina {
 
     private static JLabel etiqueta(String texto) {
         JLabel lbl = new JLabel(texto);
-        lbl.setForeground(UIStyles.TEXT);
         return lbl;
     }
 

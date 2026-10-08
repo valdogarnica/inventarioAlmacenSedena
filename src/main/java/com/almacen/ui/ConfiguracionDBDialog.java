@@ -35,7 +35,6 @@ public class ConfiguracionDBDialog extends JDialog {
         setLayout(new BorderLayout(10, 10));
         setSize(760, 440);
         setLocationRelativeTo(null);
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel panelPrincipal = new JPanel(new GridBagLayout());
         panelPrincipal.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
@@ -47,7 +46,7 @@ public class ConfiguracionDBDialog extends JDialog {
         JLabel ayuda = new JLabel("<html><div style='width:470px'>Seleccione una carpeta donde se guardará toda la "
             + "información. Ahí se guardan las bases de datos y, por cada una, su carpeta de fotos "
             + "(por ejemplo <b>inventario.db</b> usa <b>inventarioFotos</b>), que se crea automáticamente.</div></html>");
-        ayuda.setForeground(new Color(90, 100, 120));
+        UIStyles.textoSecundario(ayuda);
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 3;
@@ -97,7 +96,7 @@ public class ConfiguracionDBDialog extends JDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         lblFotos = new JLabel("-");
-        lblFotos.setForeground(new Color(45, 108, 223));
+        lblFotos.putClientProperty("FlatLaf.style", "foreground: $App.accentSoftText");
         panelPrincipal.add(lblFotos, gbc);
 
         gbc.gridx = 0;
@@ -137,7 +136,7 @@ public class ConfiguracionDBDialog extends JDialog {
         panelBotones.add(btnConectar);
         JButton btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         UIStyles.applySvgIcon(btnCancelar, "/icons/cancel.svg", 16);
         panelBotones.add(btnCancelar);
 
@@ -147,7 +146,6 @@ public class ConfiguracionDBDialog extends JDialog {
 
     private static JLabel etiqueta(String texto) {
         JLabel lbl = new JLabel(texto);
-        lbl.setForeground(UIStyles.TEXT);
         return lbl;
     }
 

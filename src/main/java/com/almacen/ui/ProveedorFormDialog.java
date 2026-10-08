@@ -30,7 +30,6 @@ public class ProveedorFormDialog extends JDialog {
         setSize(460, 280);
         setLocationRelativeTo(getOwner());
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel form = new JPanel(new GridBagLayout());
         form.setOpaque(false);
@@ -52,7 +51,7 @@ public class ProveedorFormDialog extends JDialog {
         botones.setOpaque(false);
         JButton btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         JButton btnGuardar = new JButton("Guardar");
         btnGuardar.addActionListener(e -> guardar());
         UIStyles.stylePrimaryButton(btnGuardar);
@@ -69,7 +68,6 @@ public class ProveedorFormDialog extends JDialog {
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
         JLabel lbl = new JLabel(etiqueta);
-        lbl.setForeground(UIStyles.TEXT);
         form.add(lbl, gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;

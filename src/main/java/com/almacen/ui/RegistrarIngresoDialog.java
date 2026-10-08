@@ -22,7 +22,6 @@ public class RegistrarIngresoDialog extends JDialog {
         setSize(640, 220);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
         
         JPanel panelPrincipal = new JPanel(new GridBagLayout());
         panelPrincipal.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
@@ -35,7 +34,6 @@ public class RegistrarIngresoDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 0;
         JLabel lblHerramienta = new JLabel("Material [proveedor]:");
-        lblHerramienta.setForeground(UIStyles.TEXT);
         panelPrincipal.add(lblHerramienta, gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -51,7 +49,6 @@ public class RegistrarIngresoDialog extends JDialog {
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0;
         JLabel lblCantidad = new JLabel("Cantidad a agregar:");
-        lblCantidad.setForeground(UIStyles.TEXT);
         panelPrincipal.add(lblCantidad, gbc);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -69,7 +66,7 @@ public class RegistrarIngresoDialog extends JDialog {
         btnCancelar = new JButton("Cancelar");
         btnCancelar.addActionListener(e -> dispose());
         UIStyles.stylePrimaryButton(btnRegistrar);
-        UIStyles.styleDangerButton(btnCancelar);
+        UIStyles.styleSecondaryButton(btnCancelar);
         panelBotones.add(btnCancelar);
         panelBotones.add(btnRegistrar);
         add(panelBotones, BorderLayout.SOUTH);

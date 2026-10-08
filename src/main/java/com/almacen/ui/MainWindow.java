@@ -37,9 +37,10 @@ public class MainWindow extends JFrame {
     private int totalRegistros = 0;
 
     // Menú paginado
-    private static final Color MENU_BG = new Color(0x0F172A);
     private static final int ANCHO_MENU = 248;
-    private static final int ANCHO_MENU_CONTRAIDO = 72;
+    // Con este ancho los iconos quedan donde mismo que con el menú expandido
+    private static final int ANCHO_MENU_CONTRAIDO = 64;
+    private static final int DURACION_ANIMACION_MS = 250;
     private static final int ANCHO_CONTRAER_MENU = 1200;
     private static final java.util.prefs.Preferences PREFS =
         java.util.prefs.Preferences.userNodeForPackage(MainWindow.class);
@@ -64,8 +65,10 @@ public class MainWindow extends JFrame {
     private JLabel lblTituloPagina;
     private JLabel lblSubtituloPagina;
     private JPanel itemsMenu;
-    private JLabel lblApp;
+    private JPanel lblApp;
     private JLabel lblAtajos;
+    private JButton btnTema;
+    private javax.swing.Timer animacionMenu;
     private JButton btnMenu;
     private boolean menuContraido;
     private boolean menuManual;
@@ -94,7 +97,7 @@ public class MainWindow extends JFrame {
         cargarIconoApp();
 
         JPanel raiz = new JPanel(new BorderLayout());
-        raiz.setBackground(UIStyles.BG);
+        raiz.putClientProperty("FlatLaf.style", "background: $App.background");
 
         // Contenido paginado
         cardLayout = new CardLayout();
@@ -103,15 +106,13 @@ public class MainWindow extends JFrame {
 
         // Encabezado de la página actual + empleado
         JPanel encabezado = new JPanel(new BorderLayout(12, 0));
-        encabezado.setBackground(UIStyles.CARD);
-        encabezado.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, UIStyles.BORDER),
-            BorderFactory.createEmptyBorder(12, 22, 12, 18)));
+        encabezado.setOpaque(true);
+        encabezado.putClientProperty("FlatLaf.style", "background: $App.card");
+        encabezado.setBorder(new BordeInferior());
         lblTituloPagina = new JLabel();
         lblTituloPagina.setFont(lblTituloPagina.getFont().deriveFont(Font.BOLD, 21f));
-        lblTituloPagina.setForeground(UIStyles.TEXT);
         lblSubtituloPagina = new JLabel();
-        lblSubtituloPagina.setForeground(UIStyles.MUTED);
+        UIStyles.textoSecundario(lblSubtituloPagina);
         JPanel titulos = new JPanel(new GridLayout(2, 1, 0, 0));
         titulos.setOpaque(false);
         titulos.add(lblTituloPagina);
@@ -120,17 +121,25 @@ public class MainWindow extends JFrame {
 
         JPanel panelEmpleado = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         panelEmpleado.setOpaque(false);
-        JLabel lblIconoEmpleado = new JLabel(icono("/icons/usuario.svg", 18, UIStyles.MUTED));
+        btnTema = new JButton();
+        UIStyles.styleSecondaryButton(btnTema);
+        UIStyles.estilo(btnTema, "arc: 999; margin: 7,7,7,7");
+        btnTema.addActionListener(e -> {
+            Tema.setOscuro(!Tema.esOscuro());
+            actualizarBotonTema();
+        });
+        actualizarBotonTema();
+        panelEmpleado.add(btnTema);
+        JLabel lblIconoEmpleado = new JLabel(icono("/icons/usuario.svg", 18, "App.muted"));
         panelEmpleado.add(lblIconoEmpleado);
         JPanel textoEmpleado = new JPanel(new GridLayout(2, 1, 0, 0));
         textoEmpleado.setOpaque(false);
         JLabel lblEmpleadoTitulo = new JLabel("Empleado en turno");
-        lblEmpleadoTitulo.setForeground(UIStyles.MUTED);
+        UIStyles.textoSecundario(lblEmpleadoTitulo);
         lblEmpleadoTitulo.setFont(lblEmpleadoTitulo.getFont().deriveFont(11f));
         textoEmpleado.add(lblEmpleadoTitulo);
         lblEmpleado = new JLabel("No configurado");
         lblEmpleado.setFont(lblEmpleado.getFont().deriveFont(Font.BOLD));
-        lblEmpleado.setForeground(UIStyles.TEXT);
         textoEmpleado.add(lblEmpleado);
         panelEmpleado.add(textoEmpleado);
         JButton btnCambiarEmpleado = new JButton("Cambiar");
@@ -154,25 +163,30 @@ public class MainWindow extends JFrame {
 
         // Menú lateral contraíble
         menuLateral = new JPanel(new BorderLayout());
-        menuLateral.setBackground(MENU_BG);
-        menuLateral.setBorder(BorderFactory.createEmptyBorder(14, 10, 14, 10));
+        menuLateral.setOpaque(true);
+        menuLateral.putClientProperty("FlatLaf.style", "background: $App.menu; border: 14,10,14,10");
 
         JPanel marca = new JPanel(new BorderLayout(8, 0));
         marca.setOpaque(false);
         marca.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
-        btnMenu = new JButton(icono("/icons/menu.svg", 20, new Color(0xE2E8F0)));
+        btnMenu = new JButton(icono("/icons/menu.svg", 20, "App.menuText"));
         btnMenu.setToolTipText("Contraer o expandir el menú");
-        btnMenu.putClientProperty("FlatLaf.style", "background: #0F172A; hoverBackground: #1E293B; "
-            + "pressedBackground: #334155; focusedBackground: #0F172A; borderWidth: 0; focusWidth: 0; "
+        btnMenu.putClientProperty("FlatLaf.style", "background: $App.menu; hoverBackground: $App.menuHover; "
+            + "pressedBackground: $App.menuHover; focusedBackground: $App.menu; borderWidth: 0; focusWidth: 0; "
             + "innerFocusWidth: 0; arc: 10; margin: 8,10,8,10");
         btnMenu.addActionListener(e -> {
             menuManual = true;
             setMenuContraido(!menuContraido);
         });
         marca.add(btnMenu, BorderLayout.WEST);
-        lblApp = new JLabel("<html><b style='font-size:13px'>Almacén</b><br>"
-            + "<span style='color:#94A3B8'>Inventario y préstamos</span></html>");
-        lblApp.setForeground(Color.WHITE);
+        lblApp = new JPanel(new GridLayout(2, 1, 0, 0));
+        lblApp.setOpaque(false);
+        JLabel lblNombreApp = UIStyles.titulo("Almacén", 3f);
+        lblNombreApp.putClientProperty("FlatLaf.style", "foreground: $App.menuText");
+        JLabel lblDescripcionApp = new JLabel("Inventario y préstamos");
+        lblDescripcionApp.putClientProperty("FlatLaf.style", "foreground: $App.menuMuted");
+        lblApp.add(lblNombreApp);
+        lblApp.add(lblDescripcionApp);
         marca.add(lblApp, BorderLayout.CENTER);
         menuLateral.add(marca, BorderLayout.NORTH);
 
@@ -201,14 +215,14 @@ public class MainWindow extends JFrame {
         itemsMenu.add(Box.createVerticalGlue());
         JScrollPane scrollMenu = new JScrollPane(itemsMenu,
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollMenu.setBorder(null);
+        scrollMenu.setBorder(BorderFactory.createEmptyBorder());
         scrollMenu.setOpaque(false);
         scrollMenu.getViewport().setOpaque(false);
         scrollMenu.getVerticalScrollBar().setUnitIncrement(16);
         menuLateral.add(scrollMenu, BorderLayout.CENTER);
 
-        lblAtajos = new JLabel("<html>Atajos: Ctrl+1 a Ctrl+8 para cambiar de página</html>");
-        lblAtajos.setForeground(new Color(0x94A3B8));
+        lblAtajos = new JLabel("<html>Ctrl+1 a Ctrl+8: cambiar de página</html>");
+        lblAtajos.putClientProperty("FlatLaf.style", "foreground: $App.menuMuted");
         lblAtajos.setFont(lblAtajos.getFont().deriveFont(11f));
         lblAtajos.setBorder(BorderFactory.createEmptyBorder(10, 6, 0, 0));
         menuLateral.add(lblAtajos, BorderLayout.SOUTH);
@@ -221,7 +235,8 @@ public class MainWindow extends JFrame {
         // En pantallas angostas el menú se contrae solo (salvo que el usuario lo haya elegido)
         menuContraido = PREFS.getBoolean(PREF_MENU_CONTRAIDO, false);
         menuManual = PREFS.getBoolean(PREF_MENU_MANUAL, false);
-        setMenuContraido(menuContraido);
+        aplicarMenuContraido(menuContraido);
+        menuLateral.setPreferredSize(new Dimension(menuContraido ? ANCHO_MENU_CONTRAIDO : ANCHO_MENU, 100));
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
@@ -235,21 +250,55 @@ public class MainWindow extends JFrame {
         });
     }
 
-    private static Icon icono(String ruta, int tamano, Color color) {
+    /** Icono SVG pintado con un color del tema (se actualiza solo al cambiar de modo). */
+    private static Icon icono(String ruta, int tamano, String claveColor) {
         try {
             com.formdev.flatlaf.extras.FlatSVGIcon svg = new com.formdev.flatlaf.extras.FlatSVGIcon(ruta.substring(1), tamano, tamano);
-            svg.setColorFilter(new com.formdev.flatlaf.extras.FlatSVGIcon.ColorFilter(c -> color));
+            svg.setColorFilter(new com.formdev.flatlaf.extras.FlatSVGIcon.ColorFilter(c -> Tema.color(claveColor)));
             return svg;
         } catch (Exception e) {
             return null;
         }
     }
 
-    /** Contrae el menú a solo iconos (con el nombre como ayuda emergente) o lo expande. */
+    /**
+     * Contrae el menú a solo iconos (con el nombre como ayuda emergente) o lo expande,
+     * con una animación del ancho.
+     */
     private void setMenuContraido(boolean contraido) {
         menuContraido = contraido;
         PREFS.putBoolean(PREF_MENU_CONTRAIDO, contraido);
         PREFS.putBoolean(PREF_MENU_MANUAL, menuManual);
+        if (animacionMenu != null) {
+            animacionMenu.stop();
+        }
+        if (!contraido) {
+            // Al abrir, los textos aparecen mientras el menú crece
+            aplicarMenuContraido(false);
+        }
+        int inicio = menuLateral.getWidth() > 0 ? menuLateral.getWidth() : menuLateral.getPreferredSize().width;
+        int fin = contraido ? ANCHO_MENU_CONTRAIDO : ANCHO_MENU;
+        long arranque = System.currentTimeMillis();
+        animacionMenu = new javax.swing.Timer(15, null);
+        animacionMenu.addActionListener(e -> {
+            double t = Math.min(1.0, (System.currentTimeMillis() - arranque) / (double) DURACION_ANIMACION_MS);
+            double suave = 1 - Math.pow(1 - t, 3); // desacelera al final
+            int ancho = (int) Math.round(inicio + (fin - inicio) * suave);
+            menuLateral.setPreferredSize(new Dimension(ancho, 100));
+            menuLateral.revalidate();
+            if (t >= 1.0) {
+                animacionMenu.stop();
+                if (menuContraido) {
+                    // Al cerrar, los textos se quitan cuando el menú ya es angosto
+                    aplicarMenuContraido(true);
+                }
+            }
+        });
+        animacionMenu.start();
+    }
+
+    /** Muestra u oculta los textos del menú. */
+    private void aplicarMenuContraido(boolean contraido) {
         lblApp.setVisible(!contraido);
         lblAtajos.setVisible(!contraido);
         for (JComponent seccion : seccionesMenu) {
@@ -266,14 +315,32 @@ public class MainWindow extends JFrame {
             b.setToolTipText(contraido ? titulo : null);
             b.setHorizontalAlignment(contraido ? SwingConstants.CENTER : SwingConstants.LEFT);
         }
-        menuLateral.setPreferredSize(new Dimension(contraido ? ANCHO_MENU_CONTRAIDO : ANCHO_MENU, 100));
         menuLateral.revalidate();
         menuLateral.repaint();
     }
 
+    private void actualizarBotonTema() {
+        boolean oscuro = Tema.esOscuro();
+        btnTema.setIcon(icono(oscuro ? "/icons/sol.svg" : "/icons/luna.svg", 18, "App.text"));
+        btnTema.setToolTipText(oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
+    }
+
+    /** Línea inferior del encabezado con el color de borde del tema. */
+    private static final class BordeInferior extends javax.swing.border.EmptyBorder {
+        BordeInferior() {
+            super(12, 22, 13, 18);
+        }
+
+        @Override
+        public void paintBorder(Component c, java.awt.Graphics g, int x, int y, int width, int height) {
+            g.setColor(Tema.color("App.border"));
+            g.fillRect(x, y + height - 1, width, 1);
+        }
+    }
+
     private void agregarSeccionMenu(String titulo) {
         JLabel lbl = new JLabel(titulo);
-        lbl.setForeground(new Color(0x64748B));
+        lbl.putClientProperty("FlatLaf.style", "foreground: $App.menuSection");
         lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 10.5f));
         lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
         lbl.setBorder(BorderFactory.createEmptyBorder(14, 10, 6, 0));
@@ -281,8 +348,7 @@ public class MainWindow extends JFrame {
         seccionesMenu.add(lbl);
         // Con el menú contraído, las secciones se ven como una línea
         JSeparator sep = new JSeparator();
-        sep.setForeground(new Color(0x1E293B));
-        sep.setBackground(new Color(0x1E293B));
+        sep.putClientProperty("FlatLaf.style", "foreground: $App.menuSeparator; background: $App.menuSeparator");
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 12));
         sep.setAlignmentX(Component.LEFT_ALIGNMENT);
         sep.setVisible(false);
@@ -303,10 +369,10 @@ public class MainWindow extends JFrame {
         boton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         boton.setFocusPainted(false);
         boton.putClientProperty("FlatLaf.style",
-            "background: #0F172A; foreground: #CBD5E1; selectedBackground: #2563EB; selectedForeground: #FFFFFF; " +
-            "hoverBackground: #1E293B; pressedBackground: #1D4ED8; focusedBackground: #0F172A; " +
+            "background: $App.menu; foreground: $App.menuText; selectedBackground: $App.accent; selectedForeground: #FFFFFF; " +
+            "hoverBackground: $App.menuHover; pressedBackground: $App.accentPressed; focusedBackground: $App.menu; " +
             "borderWidth: 0; focusWidth: 0; innerFocusWidth: 0; arc: 10; margin: 9,12,9,12");
-        Icon ic = icono(icono, 18, new Color(0xE2E8F0));
+        Icon ic = icono(icono, 18, "App.menuText");
         if (ic != null) {
             boton.setIcon(ic);
             boton.setIconTextGap(12);
@@ -362,7 +428,7 @@ public class MainWindow extends JFrame {
         // Panel central dividido
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPane.setOpaque(false);
-        splitPane.setBorder(null);
+        splitPane.setBorder(BorderFactory.createEmptyBorder());
         
         // Panel izquierdo - Búsqueda y resultados
         JPanel panelIzquierdo = new JPanel(new BorderLayout(12, 12));
@@ -372,7 +438,6 @@ public class MainWindow extends JFrame {
         JPanel panelBusqueda = new JPanel(new BorderLayout(10, 10));
         panelBusqueda.setOpaque(false);
         JLabel lblBuscar = new JLabel("Buscar herramienta / material:");
-        lblBuscar.setForeground(UIStyles.TEXT);
         panelBusqueda.add(lblBuscar, BorderLayout.WEST);
         txtBusqueda = new JTextField();
         txtBusqueda.putClientProperty("JTextField.placeholderText", "Escriba nombre, categoría, tipo, unidad o proveedor…");
@@ -418,7 +483,6 @@ public class MainWindow extends JFrame {
         JPanel panelPaginacion = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 2));
         panelPaginacion.setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
-        lblTamano.setForeground(UIStyles.TEXT);
         panelPaginacion.add(lblTamano);
         comboTamanoPagina = new JComboBox<>(new Integer[]{50, 100, 200});
         comboTamanoPagina.setSelectedItem(50);
@@ -437,7 +501,6 @@ public class MainWindow extends JFrame {
         UIStyles.applySvgIcon(btnSiguiente, "/icons/mayorque.svg", 16);
         panelPaginacion.add(btnSiguiente);
         lblPagina = new JLabel("Página 1 de 1");
-        lblPagina.setForeground(UIStyles.TEXT);
         panelPaginacion.add(lblPagina);
         
         JPanel panelResultadosCompleto = new JPanel(new BorderLayout());
@@ -593,7 +656,7 @@ public class MainWindow extends JFrame {
         JPanel cuerpo = new JPanel(new BorderLayout(8, 12));
         cuerpo.setOpaque(false);
         JComponent lbl = UIStyles.textoAjustable(descripcion);
-        lbl.setForeground(new Color(90, 100, 120));
+        UIStyles.textoSecundario(lbl);
         cuerpo.add(lbl, BorderLayout.CENTER);
         JButton btn = new JButton(textoBoton);
         UIStyles.stylePrimaryButton(btn);
@@ -637,10 +700,9 @@ public class MainWindow extends JFrame {
     
     private void configurarEmpleado() {
         while (true) {
-            String empleado = JOptionPane.showInputDialog(this, 
-                "Ingrese su nombre:", 
-                "Configurar Empleado", 
-                JOptionPane.QUESTION_MESSAGE);
+            String empleado = Alerta.pedirTexto(this,
+                "Ingrese su nombre para registrar préstamos y remisiones.",
+                "Empleado en turno", null);
 
             if (empleado != null && !empleado.trim().isEmpty()) {
                 lblEmpleado.setText(empleado.trim());
@@ -777,9 +839,8 @@ public class MainWindow extends JFrame {
                 + "En el carrito hay " + item.getCantidad() + " " + (item.getUnidad() != null ? item.getUnidad() : "")
                 + ".</html>"), BorderLayout.NORTH);
             panel.add(spinner, BorderLayout.CENTER);
-            int r = JOptionPane.showConfirmDialog(this, panel, "Quitar del carrito",
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-            if (r != JOptionPane.OK_OPTION) {
+            panel.setOpaque(false);
+            if (!Alerta.confirmar(this, panel, "Quitar del carrito", Alerta.Tipo.PREGUNTA, "Quitar", "Cancelar")) {
                 return;
             }
             try {
@@ -803,10 +864,8 @@ public class MainWindow extends JFrame {
         if (carrito.isEmpty()) {
             return;
         }
-        int respuesta = JOptionPane.showConfirmDialog(this,
-            "¿Desea limpiar todo el carrito?",
-            "Confirmar", JOptionPane.YES_NO_OPTION);
-        if (respuesta == JOptionPane.YES_OPTION) {
+        if (Alerta.confirmar(this, "Se quitarán todos los materiales del carrito.",
+                "¿Vaciar el carrito?", Alerta.Tipo.AVISO, "Vaciar", "Cancelar")) {
             carrito.clear();
             actualizarTablaCarrito();
         }

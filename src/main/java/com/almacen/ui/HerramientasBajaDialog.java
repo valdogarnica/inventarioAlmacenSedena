@@ -33,12 +33,10 @@ public class HerramientasBajaDialog extends JDialog {
         setSize(1100, 600);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
-        getContentPane().setBackground(UIStyles.BG);
 
         JPanel panelFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelFiltro.setOpaque(false);
         JLabel lblFiltro = new JLabel("Filtro:");
-        lblFiltro.setForeground(UIStyles.TEXT);
         panelFiltro.add(lblFiltro);
         txtFiltro = new JTextField(25);
         txtFiltro.addActionListener(e -> cargarPagina(1));
@@ -78,7 +76,6 @@ public class HerramientasBajaDialog extends JDialog {
         JPanel panelControles = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelControles.setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
-        lblTamano.setForeground(UIStyles.TEXT);
         panelControles.add(lblTamano);
         comboTamanoPagina = new JComboBox<>(new Integer[]{10, 20, 50});
         comboTamanoPagina.setSelectedItem(10);
@@ -93,7 +90,6 @@ public class HerramientasBajaDialog extends JDialog {
         UIStyles.styleSecondaryButton(btnSiguiente);
         panelControles.add(btnSiguiente);
         lblPagina = new JLabel("Página 1 de 1");
-        lblPagina.setForeground(UIStyles.TEXT);
         panelControles.add(lblPagina);
 
         add(panelControles, BorderLayout.SOUTH);
@@ -189,12 +185,8 @@ public class HerramientasBajaDialog extends JDialog {
 
     private void darDeAlta(int row) {
         int id = (Integer) modelo.getValueAt(row, 0);
-        int respuesta = JOptionPane.showConfirmDialog(this,
-            "¿Desea dar de alta esta herramienta?",
-            "Confirmar",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE);
-        if (respuesta != JOptionPane.YES_OPTION) {
+        if (!Alerta.confirmar(this, "La herramienta volverá a aparecer en el inventario.",
+                "¿Dar de alta esta herramienta?", Alerta.Tipo.PREGUNTA, "Dar de alta", "Cancelar")) {
             return;
         }
         new SwingWorker<Void, Void>() {

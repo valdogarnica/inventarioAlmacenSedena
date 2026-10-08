@@ -121,7 +121,6 @@ public class ProveedoresPanel extends JPanel implements Pagina {
         JPanel panelDetalle = new JPanel(new BorderLayout(6, 6));
         panelDetalle.setOpaque(false);
         lblSeleccion = new JLabel("Seleccione un proveedor");
-        lblSeleccion.setForeground(UIStyles.TEXT);
         lblSeleccion.setFont(lblSeleccion.getFont().deriveFont(Font.BOLD, 14f));
         panelDetalle.add(lblSeleccion, BorderLayout.NORTH);
         panelDetalle.add(pestanas, BorderLayout.CENTER);
@@ -130,7 +129,7 @@ public class ProveedoresPanel extends JPanel implements Pagina {
             UIStyles.createCard("Proveedores", new JScrollPane(tablaProveedores)),
             UIStyles.createCard("Detalle", panelDetalle));
         split.setResizeWeight(0.45);
-        split.setBorder(null);
+        split.setBorder(BorderFactory.createEmptyBorder());
         split.setOpaque(false);
         add(split, BorderLayout.CENTER);
     }

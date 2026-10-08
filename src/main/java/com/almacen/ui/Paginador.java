@@ -19,7 +19,6 @@ public class Paginador extends JPanel {
         super(new WrapLayout(FlowLayout.RIGHT, 8, 4));
         setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
-        lblTamano.setForeground(UIStyles.TEXT);
         add(lblTamano);
         comboTamano = new JComboBox<>(tamanos);
         comboTamano.setSelectedItem(tamanoInicial);
@@ -33,7 +32,6 @@ public class Paginador extends JPanel {
         UIStyles.styleSecondaryButton(btnSiguiente);
         UIStyles.applySvgIcon(btnSiguiente, "/icons/mayorque.svg", 16);
         add(btnSiguiente);
-        lblPagina.setForeground(UIStyles.TEXT);
         add(lblPagina);
     }
 
