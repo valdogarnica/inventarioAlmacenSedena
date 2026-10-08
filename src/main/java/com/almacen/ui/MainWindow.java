@@ -47,6 +47,7 @@ public class MainWindow extends JFrame {
         java.util.prefs.Preferences.userNodeForPackage(MainWindow.class);
     private static final String PREF_MENU_CONTRAIDO = "menu_contraido";
     private static final String PREF_MENU_MANUAL = "menu_manual";
+    private static final String PAG_INICIO = "inicio";
     private static final String PAG_PRESTAMO = "prestamo";
     private static final String PAG_PRESTAMOS = "prestamos";
     private static final String PAG_INVENTARIO = "inventario";
@@ -82,7 +83,7 @@ public class MainWindow extends JFrame {
     private final Map<String, JComponent> paginas = new HashMap<>();
     private final Map<String, String> titulosPaginas = new HashMap<>();
     private final List<String> ordenPaginas = new ArrayList<>();
-    private String paginaVisible = PAG_PRESTAMO;
+    private String paginaVisible = PAG_INICIO;
     
     public MainWindow() {
         carrito = new ArrayList<>();
@@ -196,6 +197,8 @@ public class MainWindow extends JFrame {
         itemsMenu = new JPanel();
         itemsMenu.setLayout(new BoxLayout(itemsMenu, BoxLayout.Y_AXIS));
         itemsMenu.setOpaque(false);
+        agregarPagina(PAG_INICIO, "Inicio", "/icons/inicio.svg", new InicioPanel(),
+            "Resumen del almacén con gráficas y lo que necesita atención");
         agregarSeccionMenu("PRÉSTAMOS");
         agregarPagina(PAG_PRESTAMO, "Nuevo préstamo", "/icons/carrito.svg", crearPaginaPrestamo(),
             "Busque material y agréguelo al carrito para prestarlo");
@@ -224,7 +227,7 @@ public class MainWindow extends JFrame {
         scrollMenu.getVerticalScrollBar().setUnitIncrement(16);
         menuLateral.add(scrollMenu, BorderLayout.CENTER);
 
-        lblAtajos = new JLabel("<html>Ctrl+1 a Ctrl+8: cambiar de página</html>");
+        lblAtajos = new JLabel("<html>Ctrl+1 a Ctrl+9: cambiar de página</html>");
         lblAtajos.putClientProperty("FlatLaf.style", "foreground: $App.menuMuted");
         lblAtajos.setFont(lblAtajos.getFont().deriveFont(11f));
         lblAtajos.setBorder(BorderFactory.createEmptyBorder(10, 6, 0, 0));
@@ -729,8 +732,8 @@ public class MainWindow extends JFrame {
             abrirConfiguracion();
         }
         configurarEmpleado();
-        // Mostrar la primera página y cargar resultados al iniciar
-        mostrarPagina(PAG_PRESTAMO);
+        // Al iniciar se muestra el resumen del almacén
+        mostrarPagina(PAG_INICIO);
     }
     
     private void abrirConfiguracion() {

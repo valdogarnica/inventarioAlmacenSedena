@@ -10,6 +10,7 @@ import com.almacen.model.ReportePrestamoItem;
 import com.almacen.model.DetalleRemision;
 import com.almacen.model.Proveedor;
 import com.almacen.model.Remision;
+import com.almacen.model.ResumenInicio;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -2203,5 +2204,115 @@ public class DatabaseManager {
             }
         }
         return entradas;
+    }
+
+    // ---------------------------------------------------------------- Inicio (análisis)
+
+    private static final String[] MESES = {"Ene", "Feb", "Mar", "Abr", "May", "Jun",
+        "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"};
+
+    /**
+     * Indicadores y listas de la página Inicio. Los materiales se cuentan sumando sus
+     * proveedores; {@code umbralBajo} es la cantidad a partir de la cual el stock es bajo.
+     */
+    public ResumenInicio obtenerResumenInicio(int umbralBajo) throws SQLException {
+        ResumenInicio r = new ResumenInicio();
+        r.umbralBajo = umbralBajo;
+        String materiales = "SELECT MIN(TRIM(h.nombre)) AS nombre, MIN(h.unidad) AS unidad, MIN(h.tipo) AS tipo, " +
+                "SUM(h.stock) AS disponible, SUM(" + PRESTADO_HERRAMIENTA + ") AS prestado " +
+                "FROM herramientas h WHERE h.estado = 1 GROUP BY " + CLAVE_MATERIAL +
+                " ORDER BY SUM(h.stock) ASC, LOWER(MIN(TRIM(h.nombre))) ASC";
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(materiales)) {
+            while (rs.next()) {
+                ResumenInicio.Material m = new ResumenInicio.Material(rs.getString("nombre"), rs.getString("unidad"),
+                    rs.getString("tipo"), rs.getInt("disponible"), rs.getInt("prestado"));
+                r.materiales++;
+                r.disponible += m.disponible;
+                r.prestado += m.prestado;
+                if (m.disponible <= 0) {
+                    r.sinStock.add(m);
+                } else if (m.disponible <= umbralBajo) {
+                    r.stockBajo.add(m);
+                }
+            }
+        }
+        llenarDatos(r.stockPorTipo, "SELECT COALESCE(NULLIF(TRIM(h.tipo), ''), 'Sin tipo') AS e, SUM(h.stock) AS v " +
+                "FROM herramientas h WHERE h.estado = 1 GROUP BY LOWER(e) ORDER BY v DESC");
+        llenarDatos(r.stockPorProveedor, "SELECT COALESCE(p.nombre, 'Sin proveedor') AS e, SUM(h.stock) AS v " +
+                "FROM herramientas h LEFT JOIN proveedores p ON p.id = h.proveedor_id WHERE h.estado = 1 " +
+                "GROUP BY h.proveedor_id ORDER BY v DESC LIMIT 8");
+        llenarDatos(r.masPrestados, "SELECT MIN(TRIM(d.nombre_herramienta)) AS e, SUM(d.cantidad) AS v " +
+                "FROM detalle_prestamos d WHERE d.no_retorno = 0 GROUP BY LOWER(TRIM(d.nombre_herramienta)) " +
+                "ORDER BY v DESC LIMIT 8");
+        llenarDatos(r.masEntregadosNoRetorno, "SELECT MIN(TRIM(d.nombre_herramienta)) AS e, SUM(d.cantidad) AS v " +
+                "FROM detalle_prestamos d WHERE d.no_retorno = 1 GROUP BY LOWER(TRIM(d.nombre_herramienta)) " +
+                "ORDER BY v DESC LIMIT 8");
+        for (ResumenInicio.Dato d : r.masEntregadosNoRetorno) {
+            r.entregadoNoRetorno += d.valor;
+        }
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM prestamos WHERE estado = 'PRESTADO'")) {
+            r.prestamosActivos = rs.next() ? rs.getInt(1) : 0;
+        }
+
+        // Préstamos de los últimos 6 meses, incluidos los meses sin préstamos
+        LocalDate inicio = LocalDate.now().withDayOfMonth(1).minusMonths(5);
+        java.util.Map<String, Integer> porMes = new java.util.HashMap<>();
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT SUBSTR(fecha_prestamo, 1, 7) AS mes, COUNT(*) FROM prestamos WHERE fecha_prestamo >= ? GROUP BY mes")) {
+            ps.setString(1, inicio.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    porMes.put(rs.getString(1), rs.getInt(2));
+                }
+            }
+        }
+        for (int i = 0; i < 6; i++) {
+            LocalDate mes = inicio.plusMonths(i);
+            String clave = mes.toString().substring(0, 7);
+            r.prestamosPorMes.add(new ResumenInicio.Dato(MESES[mes.getMonthValue() - 1] + " " + (mes.getYear() % 100),
+                porMes.getOrDefault(clave, 0)));
+        }
+
+        String antiguos = "SELECT p.id, p.nombre_cliente, p.fecha_prestamo, SUM(d.cantidad - d.cantidad_devuelta) AS pend " +
+                "FROM prestamos p JOIN detalle_prestamos d ON d.prestamo_id = p.id AND d.no_retorno = 0 " +
+                "WHERE p.estado = 'PRESTADO' GROUP BY p.id HAVING pend > 0 ORDER BY p.fecha_prestamo ASC LIMIT 10";
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(antiguos)) {
+            while (rs.next()) {
+                String fecha = rs.getString("fecha_prestamo");
+                long dias = 0;
+                String fechaTexto = fecha;
+                try {
+                    LocalDate f = LocalDate.parse(fecha.substring(0, 10));
+                    dias = java.time.temporal.ChronoUnit.DAYS.between(f, LocalDate.now());
+                    fechaTexto = f.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                } catch (RuntimeException ignored) {
+                    // Fecha con otro formato: se muestra tal cual
+                }
+                r.prestamosAntiguos.add(new ResumenInicio.PrestamoPendiente(rs.getInt("id"),
+                    rs.getString("nombre_cliente"), fechaTexto, dias, rs.getInt("pend")));
+            }
+        }
+        return r;
+    }
+
+    private void llenarDatos(List<ResumenInicio.Dato> destino, String sql) throws SQLException {
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                destino.add(new ResumenInicio.Dato(rs.getString("e"), rs.getInt("v")));
+            }
+        }
+    }
+
+    /** Piezas de no retorno entregadas en préstamos, por registro de material. */
+    public java.util.Map<Integer, Integer> obtenerEntregadoNoRetorno() throws SQLException {
+        java.util.Map<Integer, Integer> mapa = new java.util.HashMap<>();
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(
+                "SELECT herramienta_id, SUM(cantidad) FROM detalle_prestamos WHERE no_retorno = 1 GROUP BY herramienta_id")) {
+            while (rs.next()) {
+                mapa.put(rs.getInt(1), rs.getInt(2));
+            }
+        }
+        return mapa;
     }
 }

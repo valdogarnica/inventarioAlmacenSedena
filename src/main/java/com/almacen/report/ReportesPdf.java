@@ -9,6 +9,7 @@ import com.almacen.model.Prestamo;
 import com.almacen.model.Proveedor;
 import com.almacen.model.Remision;
 import com.almacen.model.ReportePrestamoItem;
+import com.almacen.model.ResumenInicio;
 
 import java.io.File;
 import java.time.LocalDate;
@@ -115,6 +116,178 @@ public final class ReportesPdf {
             pdf.tabla(new String[]{"Unidad", "Cantidad total"}, new float[]{3, 2}, new boolean[]{false, true}, resumen, null);
             return pdf.guardarTemporal("reporte_inventario_");
         }
+    }
+
+    /**
+     * Inventario por tipo de material. Con {@code tipo} null incluye el resumen de todos los
+     * tipos y el detalle de cada uno; con un tipo, solo sus materiales.
+     */
+    public static File inventarioPorTipo(String tipo) throws Exception {
+        DatabaseManager db = DatabaseManager.getInstance();
+        java.util.Set<String> noRetorno = db.obtenerTiposNoRetorno();
+        Map<Integer, Integer> entregado = db.obtenerEntregadoNoRetorno();
+        Map<String, List<Herramienta>> porTipo = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Herramienta h : db.obtenerInventarioGeneral(null)) {
+            String t = h.getTipo() == null || h.getTipo().trim().isEmpty() ? "Sin tipo" : h.getTipo().trim();
+            if (tipo == null || t.equalsIgnoreCase(tipo.trim())) {
+                porTipo.computeIfAbsent(t, k -> new ArrayList<>()).add(h);
+            }
+        }
+        if (porTipo.isEmpty()) {
+            return null;
+        }
+        try (PdfReportBuilder pdf = new PdfReportBuilder("REPORTE DE INVENTARIO POR TIPO", true)) {
+            if (tipo == null) {
+                pdf.subtitulo("Resumen por tipo");
+                List<String[]> resumen = new ArrayList<>();
+                int[] tot = new int[5];
+                for (Map.Entry<String, List<Herramienta>> e : porTipo.entrySet()) {
+                    int[] t = totales(e.getValue(), entregado);
+                    resumen.add(new String[]{e.getKey(), devolucion(noRetorno, e.getKey()),
+                        String.valueOf(materialesDistintos(e.getValue())), String.valueOf(t[0]),
+                        String.valueOf(t[1]), String.valueOf(t[2]), String.valueOf(t[0] + t[1])});
+                    tot[0] += t[0];
+                    tot[1] += t[1];
+                    tot[2] += t[2];
+                }
+                pdf.tabla(new String[]{"Tipo", "Devolución", "Materiales", "Disponible", "Prestado",
+                        "Entregado (no retorno)", "Existencia"},
+                    new float[]{18, 12, 10, 10, 10, 14, 10},
+                    new boolean[]{false, false, true, true, true, true, true},
+                    resumen,
+                    new String[]{"TOTAL", "", "", String.valueOf(tot[0]), String.valueOf(tot[1]),
+                        String.valueOf(tot[2]), String.valueOf(tot[0] + tot[1])});
+                pdf.subtitulo("Piezas disponibles por tipo");
+                List<String> etiquetas = new ArrayList<>();
+                List<Integer> valores = new ArrayList<>();
+                for (Map.Entry<String, List<Herramienta>> e : porTipo.entrySet()) {
+                    etiquetas.add(e.getKey());
+                    valores.add(totales(e.getValue(), entregado)[0]);
+                }
+                pdf.barras(etiquetas, valores);
+            }
+            for (Map.Entry<String, List<Herramienta>> e : porTipo.entrySet()) {
+                e.getValue().sort((x, y) -> safe(x.getNombre()).compareToIgnoreCase(safe(y.getNombre())));
+                pdf.subtitulo("Tipo: " + e.getKey() + "  (" + devolucion(noRetorno, e.getKey()).toLowerCase() + ")");
+                List<String[]> filas = new ArrayList<>();
+                for (Herramienta h : e.getValue()) {
+                    filas.add(new String[]{
+                        safe(h.getNombre()),
+                        safe(h.getCategoria()),
+                        safe(h.getUnidad()),
+                        guion(h.getProveedorNombre()),
+                        String.valueOf(h.getStock()),
+                        String.valueOf(h.getCantidadPrestada()),
+                        String.valueOf(entregado.getOrDefault(h.getId(), 0)),
+                        String.valueOf(h.getStock() + h.getCantidadPrestada())
+                    });
+                }
+                int[] t = totales(e.getValue(), entregado);
+                pdf.tabla(new String[]{"Material", "Categoría", "Unidad", "Proveedor", "Disponible", "Prestado",
+                        "Entregado", "Existencia"},
+                    new float[]{24, 15, 8, 16, 9, 8, 8, 9},
+                    new boolean[]{false, false, false, false, true, true, true, true},
+                    filas,
+                    new String[]{"TOTAL", "", "", "", String.valueOf(t[0]), String.valueOf(t[1]),
+                        String.valueOf(t[2]), String.valueOf(t[0] + t[1])});
+            }
+            pdf.linea("Entregado = piezas de material de no retorno que salieron en préstamos y no se devuelven.");
+            return pdf.guardarTemporal("reporte_tipo_");
+        }
+    }
+
+    private static int[] totales(List<Herramienta> materiales, Map<Integer, Integer> entregado) {
+        int[] t = new int[3];
+        for (Herramienta h : materiales) {
+            t[0] += h.getStock();
+            t[1] += h.getCantidadPrestada();
+            t[2] += entregado.getOrDefault(h.getId(), 0);
+        }
+        return t;
+    }
+
+    private static int materialesDistintos(List<Herramienta> materiales) {
+        java.util.Set<String> claves = new java.util.HashSet<>();
+        for (Herramienta h : materiales) {
+            claves.add(safe(h.getNombre()).trim().toLowerCase() + "|" + safe(h.getUnidad()).trim().toLowerCase());
+        }
+        return claves.size();
+    }
+
+    private static String devolucion(java.util.Set<String> noRetorno, String tipo) {
+        return noRetorno.contains(tipo.trim().toLowerCase()) ? "No retorno" : "Se devuelve";
+    }
+
+    /** Análisis del almacén (lo mismo que la página Inicio): indicadores, gráficas y listas. */
+    public static File analisisAlmacen(int umbralBajo) throws Exception {
+        ResumenInicio r = DatabaseManager.getInstance().obtenerResumenInicio(umbralBajo);
+        if (r.materiales == 0) {
+            return null;
+        }
+        try (PdfReportBuilder pdf = new PdfReportBuilder("ANÁLISIS DEL ALMACÉN", false)) {
+            pdf.datos(new String[][]{
+                {"Materiales", String.valueOf(r.materiales)},
+                {"Piezas disponibles", String.valueOf(r.disponible)},
+                {"Piezas prestadas", String.valueOf(r.prestado)},
+                {"Préstamos activos", String.valueOf(r.prestamosActivos)},
+                {"Sin stock", String.valueOf(r.sinStock.size())},
+                {"Stock bajo (hasta " + umbralBajo + ")", String.valueOf(r.stockBajo.size())}
+            }, 3);
+            pdf.subtitulo("Análisis");
+            for (String linea : com.almacen.ui.InicioPanel.analisis(r)) {
+                // La fuente del PDF no tiene viñeta "•"
+                pdf.parrafo(linea.replace("• ", "- "));
+            }
+            graficaPdf(pdf, "Préstamos por mes (últimos 6 meses)", r.prestamosPorMes);
+            graficaPdf(pdf, "Piezas disponibles por tipo", r.stockPorTipo);
+            graficaPdf(pdf, "Herramientas más prestadas", r.masPrestados);
+            graficaPdf(pdf, "Material de no retorno más entregado", r.masEntregadosNoRetorno);
+            graficaPdf(pdf, "Piezas disponibles por proveedor", r.stockPorProveedor);
+            if (!r.sinStock.isEmpty()) {
+                pdf.subtitulo("Materiales sin stock");
+                pdf.tabla(new String[]{"Material", "Unidad", "Tipo", "Prestado"}, new float[]{40, 15, 25, 12},
+                    new boolean[]{false, false, false, true}, filasMateriales(r.sinStock, false), null);
+            }
+            if (!r.stockBajo.isEmpty()) {
+                pdf.subtitulo("Materiales con stock bajo (" + umbralBajo + " o menos)");
+                pdf.tabla(new String[]{"Material", "Unidad", "Tipo", "Disponible"}, new float[]{40, 15, 25, 12},
+                    new boolean[]{false, false, false, true}, filasMateriales(r.stockBajo, true), null);
+            }
+            if (!r.prestamosAntiguos.isEmpty()) {
+                pdf.subtitulo("Préstamos pendientes más antiguos");
+                List<String[]> filas = new ArrayList<>();
+                for (ResumenInicio.PrestamoPendiente p : r.prestamosAntiguos) {
+                    filas.add(new String[]{"#" + p.id, safe(p.cliente), p.fecha, String.valueOf(p.dias),
+                        String.valueOf(p.pendientes)});
+                }
+                pdf.tabla(new String[]{"Préstamo", "Cliente", "Fecha", "Días", "Pendientes"},
+                    new float[]{10, 38, 16, 10, 12}, new boolean[]{false, false, false, true, true}, filas, null);
+            }
+            return pdf.guardarTemporal("analisis_almacen_");
+        }
+    }
+
+    private static void graficaPdf(PdfReportBuilder pdf, String titulo, List<ResumenInicio.Dato> datos) throws Exception {
+        if (datos.isEmpty()) {
+            return;
+        }
+        pdf.subtitulo(titulo);
+        List<String> etiquetas = new ArrayList<>();
+        List<Integer> valores = new ArrayList<>();
+        for (ResumenInicio.Dato d : datos) {
+            etiquetas.add(d.etiqueta);
+            valores.add(d.valor);
+        }
+        pdf.barras(etiquetas, valores);
+    }
+
+    private static List<String[]> filasMateriales(List<ResumenInicio.Material> materiales, boolean disponible) {
+        List<String[]> filas = new ArrayList<>();
+        for (ResumenInicio.Material m : materiales) {
+            filas.add(new String[]{safe(m.nombre), guion(m.unidad), guion(m.tipo),
+                String.valueOf(disponible ? m.disponible : m.prestado)});
+        }
+        return filas;
     }
 
     // ---------------------------------------------------------------- Remisiones

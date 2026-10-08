@@ -17,6 +17,7 @@ public final class AppPreferences {
     private static final String KEY_LEGACY_PHOTO_FOLDER = "legacy_photo_folder_path";
     private static final String SUFIJO_FOTOS = "Fotos";
     private static final String KEY_MAYUSCULAS = "escribir_mayusculas";
+    private static final String KEY_UMBRAL_STOCK_BAJO = "umbral_stock_bajo";
 
     private AppPreferences() {
     }
@@ -105,5 +106,14 @@ public final class AppPreferences {
 
     public static void setMayusculas(boolean activo) {
         PREFS.putBoolean(KEY_MAYUSCULAS, activo);
+    }
+
+    /** Cantidad hasta la que un material se considera con stock bajo (página Inicio). */
+    public static int getUmbralStockBajo() {
+        return PREFS.getInt(KEY_UMBRAL_STOCK_BAJO, 5);
+    }
+
+    public static void setUmbralStockBajo(int umbral) {
+        PREFS.putInt(KEY_UMBRAL_STOCK_BAJO, umbral);
     }
 }

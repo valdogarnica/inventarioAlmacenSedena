@@ -18,6 +18,8 @@ public class ReportesPanel extends JPanel implements Pagina {
     private final SelectorFecha dateDesde = new SelectorFecha();
     private final SelectorFecha dateHasta = new SelectorFecha();
     private final JComboBox<String> comboHerramienta = new JComboBox<>();
+    private final JComboBox<String> comboTipo = new JComboBox<>();
+    private static final String TODOS_LOS_TIPOS = "(Todos los tipos)";
 
     public ReportesPanel() {
         super(new BorderLayout());
@@ -99,6 +101,23 @@ public class ReportesPanel extends JPanel implements Pagina {
                 PdfViewer.generarYAbrir(this, () -> ReportesPdf.prestamosPorHerramienta(h), "No hay datos de esa herramienta");
             }));
 
+        comboTipo.setPreferredSize(new Dimension(260, 28));
+        ComboBuscable.instalar(comboTipo);
+        grid.add(tarjeta("Reporte por tipo",
+            "Materiales agrupados por tipo (herramienta, material, equipo…): disponible, prestado, entregado como no retorno y existencia, con el resumen y la gráfica de todos los tipos.",
+            fila("Tipo:", comboTipo),
+            () -> {
+                Object t = comboTipo.getSelectedItem();
+                String tipo = t == null || TODOS_LOS_TIPOS.equals(t) ? null : t.toString();
+                PdfViewer.generarYAbrir(this, () -> ReportesPdf.inventarioPorTipo(tipo), "No hay materiales de ese tipo");
+            }));
+
+        grid.add(tarjeta("Análisis del almacén",
+            "Lo mismo que la página Inicio: indicadores, gráficas de préstamos y existencias, materiales sin stock o con stock bajo y préstamos pendientes más antiguos.",
+            null,
+            () -> PdfViewer.generarYAbrir(this, () -> ReportesPdf.analisisAlmacen(AppPreferences.getUmbralStockBajo()),
+                "No hay materiales para analizar")));
+
         JPanel contenedor = new JPanel(new BorderLayout());
         contenedor.setOpaque(false);
         contenedor.add(grid, BorderLayout.NORTH);
@@ -123,6 +142,13 @@ public class ReportesPanel extends JPanel implements Pagina {
             if (actual != null) {
                 comboHerramienta.setSelectedItem(actual);
             }
+            Object tipoActual = comboTipo.getSelectedItem();
+            comboTipo.removeAllItems();
+            comboTipo.addItem(TODOS_LOS_TIPOS);
+            for (String t : DatabaseManager.getInstance().obtenerCatalogo(com.almacen.database.Catalogo.TIPOS)) {
+                comboTipo.addItem(t);
+            }
+            comboTipo.setSelectedItem(tipoActual != null ? tipoActual : TODOS_LOS_TIPOS);
         } catch (Exception e) {
             Notificaciones.showMessageDialog(this, "Error al cargar herramientas: " + e.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);

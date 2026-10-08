@@ -52,7 +52,7 @@ public final class Mayusculas {
     private static void aplicar(JTextComponent campo) {
         // Contraseñas y campos con formato (números, fechas) tienen su propio filtro
         if (campo instanceof JPasswordField || campo instanceof JFormattedTextField
-                || campo.getClientProperty(INSTALADO) == campo.getDocument()) {
+                || instalado(campo)) {
             return;
         }
         Document doc = campo.getDocument();
@@ -61,11 +61,19 @@ public final class Mayusculas {
         }
         AbstractDocument ad = (AbstractDocument) doc;
         ad.setDocumentFilter(new Filtro(campo, ad.getDocumentFilter()));
-        campo.putClientProperty(INSTALADO, doc);
+        // Se guarda en una referencia y no el Document directo: BasicTextUI y DefaultCaret
+        // toman cualquier cambio de propiedad con un Document como "cambió el documento" y
+        // vuelven a registrar sus oyentes (quedaban duplicados y fallaba setText)
+        campo.putClientProperty(INSTALADO, new java.lang.ref.WeakReference<>(doc));
         if (campo.getClientProperty(OYENTE) == null) {
             campo.putClientProperty(OYENTE, Boolean.TRUE);
             campo.addPropertyChangeListener("document", e -> aplicar(campo));
         }
+    }
+
+    private static boolean instalado(JTextComponent campo) {
+        Object ref = campo.getClientProperty(INSTALADO);
+        return ref instanceof java.lang.ref.Reference && ((java.lang.ref.Reference<?>) ref).get() == campo.getDocument();
     }
 
     private static final class Filtro extends DocumentFilter {

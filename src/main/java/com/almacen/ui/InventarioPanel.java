@@ -134,6 +134,8 @@ public class InventarioPanel extends JPanel implements Pagina {
         tabla.getColumnModel().getColumn(5).setPreferredWidth(150);
         TablaBotones.instalar(tabla, COL_EDITAR, "Editar", TablaBotones.Estilo.SECUNDARIO, this::editar);
         TablaBotones.instalar(tabla, COL_BAJA, "Baja", TablaBotones.Estilo.PELIGRO, this::darDeBaja);
+        tabla.getColumnModel().getColumn(COL_EDITAR).setMinWidth(78);
+        tabla.getColumnModel().getColumn(COL_BAJA).setMinWidth(70);
 
         String[] columnasAgrupado = {"Material", "Unidad", "Categoría", "Tipo", "Proveedores", "Disponible",
             "Prestado", "Total", "Detalle"};

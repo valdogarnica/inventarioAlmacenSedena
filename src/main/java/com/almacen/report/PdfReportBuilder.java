@@ -143,6 +143,51 @@ public class PdfReportBuilder implements Closeable {
         y -= 24;
     }
 
+    /** Texto que se acomoda en varias líneas según el ancho de la página. */
+    public void parrafo(String texto) throws IOException {
+        float maximo = getAnchoUtil();
+        StringBuilder linea = new StringBuilder();
+        for (String palabra : texto.split(" ")) {
+            String prueba = linea.length() == 0 ? palabra : linea + " " + palabra;
+            if (linea.length() > 0 && ancho(FONT, 10, prueba) > maximo) {
+                linea(linea.toString());
+                linea = new StringBuilder("   " + palabra);
+            } else {
+                linea = new StringBuilder(prueba);
+            }
+        }
+        if (linea.length() > 0) {
+            linea(linea.toString());
+        }
+    }
+
+    /** Gráfica de barras horizontales sencilla: etiqueta, barra y valor. */
+    public void barras(List<String> etiquetas, List<Integer> valores) throws IOException {
+        int max = 1;
+        for (int v : valores) {
+            max = Math.max(max, v);
+        }
+        float anchoEtiqueta = getAnchoUtil() * 0.28f;
+        float anchoBarras = getAnchoUtil() - anchoEtiqueta - 50;
+        float alto = 11;
+        for (int i = 0; i < etiquetas.size(); i++) {
+            asegurarEspacio(alto + 6);
+            int v = valores.get(i);
+            texto(FONT, 9, recortar(FONT, 9, etiquetas.get(i), anchoEtiqueta - 6), margin, y - 8);
+            float x = margin + anchoEtiqueta;
+            float largo = v <= 0 ? 0 : Math.max(2, anchoBarras * v / max);
+            if (largo > 0) {
+                content.setNonStrokingColor(HEADER_BG);
+                content.addRect(x, y - alto, largo, alto);
+                content.fill();
+                content.setNonStrokingColor(Color.BLACK);
+            }
+            texto(FONT_BOLD, 9, String.valueOf(v), x + largo + 5, y - 8);
+            y -= alto + 6;
+        }
+        y -= 10;
+    }
+
     public void espacio(float alto) {
         y -= alto;
     }
