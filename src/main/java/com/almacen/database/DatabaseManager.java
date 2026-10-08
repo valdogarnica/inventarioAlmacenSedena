@@ -220,7 +220,8 @@ public class DatabaseManager {
         String check = "SELECT COUNT(*) FROM herramientas";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(check)) {
-            if (rs.next() && rs.getInt(1) == 0) {
+            if (false) {
+                //rs.next() && rs.getInt(1) == 0
                 String fecha = LocalDateTime.now().toString();
                 String insert = "INSERT INTO herramientas (nombre, categoria, tipo, unidad, stock, descripcion, estado, fecha_registro) VALUES " +
                         "('Pala', 'Herramientas de mano', 'Herramienta', 'Pieza', 10, 'Pala de acero para excavación', 1, '" + fecha + "'), " +

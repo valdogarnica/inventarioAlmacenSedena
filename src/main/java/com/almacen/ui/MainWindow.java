@@ -29,7 +29,7 @@ public class MainWindow extends JFrame {
     private JButton btnLimpiarCarrito;
     private JButton btnRealizarPrestamo;
     private JLabel lblEmpleado;
-    private List<ItemCarrito> carrito;
+    private final List<ItemCarrito> carrito;
     private JButton btnAnterior;
     private JButton btnSiguiente;
     private JLabel lblPagina;
@@ -227,7 +227,7 @@ public class MainWindow extends JFrame {
         scrollMenu.getVerticalScrollBar().setUnitIncrement(16);
         menuLateral.add(scrollMenu, BorderLayout.CENTER);
 
-        lblAtajos = new JLabel("<html>Ctrl+1 a Ctrl+9: cambiar de página</html>");
+        lblAtajos = new JLabel("<html>V1.0 by DevG2 Studios<</html>");
         lblAtajos.putClientProperty("FlatLaf.style", "foreground: $App.menuMuted");
         lblAtajos.setFont(lblAtajos.getFont().deriveFont(11f));
         lblAtajos.setBorder(BorderFactory.createEmptyBorder(10, 6, 0, 0));
@@ -391,6 +391,7 @@ public class MainWindow extends JFrame {
     }
 
     private void registrarAtajos() {
+        @SuppressWarnings("LocalVariableHidesMemberVariable")
         JRootPane rootPane = getRootPane();
         for (int i = 0; i < ordenPaginas.size() && i < 9; i++) {
             String id = ordenPaginas.get(i);

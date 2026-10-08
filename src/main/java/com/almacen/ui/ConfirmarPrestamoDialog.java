@@ -35,8 +35,8 @@ public class ConfirmarPrestamoDialog extends JDialog {
     private DefaultTableModel modeloResumen;
     private JButton btnConfirmar;
     private JButton btnCancelar;
-    private List<ItemCarrito> items;
-    private String nombreEmpleado;
+    private final List<ItemCarrito> items;
+    private final String nombreEmpleado;
     private boolean prestamoConfirmado = false;
     
     public ConfirmarPrestamoDialog(JFrame parent, List<ItemCarrito> items, String nombreEmpleado) {
@@ -47,7 +47,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
     }
     
     private void initComponents() {
-        setSize(980, 700);
+        setSize(1100, 700);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
