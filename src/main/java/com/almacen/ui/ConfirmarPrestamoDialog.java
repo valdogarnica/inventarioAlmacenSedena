@@ -139,7 +139,7 @@ public class ConfirmarPrestamoDialog extends JDialog {
         };
         tablaResumen = new JTable(modeloResumen);
         tablaResumen.getTableHeader().setReorderingAllowed(false);
-        tablaResumen.setRowHeight(28);
+        tablaResumen.setRowHeight(32);
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaResumen);
         DefaultTableCellRenderer centerRenderer = UIStyles.createCenteredNumberRenderer();

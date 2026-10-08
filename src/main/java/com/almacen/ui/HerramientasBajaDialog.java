@@ -66,7 +66,7 @@ public class HerramientasBajaDialog extends JDialog {
         tabla = new JTable(modelo);
         tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tabla.getTableHeader().setReorderingAllowed(false);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         tabla.getColumnModel().getColumn(7).setCellRenderer(new AltaRenderer());
         tabla.getColumnModel().getColumn(7).setCellEditor(new AltaEditor());
         // Estilizar encabezado y centrar números

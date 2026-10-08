@@ -27,7 +27,7 @@ public class ReportesPanel extends JPanel implements Pagina {
     }
 
     private void initComponents() {
-        JPanel grid = new JPanel(new GridLayout(0, 2, 14, 14));
+        JPanel grid = new JPanel(new GridResponsivo(400, 2, 14, 14));
         grid.setOpaque(false);
 
         grid.add(tarjeta("Reporte general de inventario",
@@ -57,7 +57,7 @@ public class ReportesPanel extends JPanel implements Pagina {
         selProveedorEntradas = new ProveedorSelector("(Todos los proveedores)", false);
         JPanel controlesEntradas = new JPanel(new GridLayout(2, 1, 4, 4));
         controlesEntradas.setOpaque(false);
-        JPanel fechas = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JPanel fechas = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 0));
         fechas.setOpaque(false);
         fechas.add(etiqueta("Desde:"));
         fechas.add(dateDesde);
@@ -151,8 +151,7 @@ public class ReportesPanel extends JPanel implements Pagina {
     private JPanel tarjeta(String titulo, String descripcion, JComponent controles, Runnable accion) {
         JPanel cuerpo = new JPanel(new BorderLayout(8, 10));
         cuerpo.setOpaque(false);
-        JLabel lblDesc = new JLabel("<html><div style='width:360px'>" + descripcion + "</div></html>");
-        lblDesc.setForeground(new Color(90, 100, 120));
+        JComponent lblDesc = UIStyles.textoAjustable(descripcion);
         cuerpo.add(lblDesc, BorderLayout.NORTH);
         if (controles != null) {
             JPanel envoltura = new JPanel(new BorderLayout());

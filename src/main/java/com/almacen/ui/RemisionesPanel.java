@@ -30,7 +30,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
     }
 
     private void initComponents() {
-        JPanel filtros = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        JPanel filtros = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         filtros.setOpaque(false);
         JLabel lbl = new JLabel("Buscar:");
         lbl.setForeground(UIStyles.TEXT);
@@ -39,7 +39,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
         txtFiltro.getDocument().addDocumentListener(new SimpleDocumentListener(() -> cargarPagina(1)));
         filtros.add(txtFiltro);
 
-        JPanel acciones = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        JPanel acciones = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         acciones.setOpaque(false);
         JButton btnNueva = new JButton("Nueva remisión");
         btnNueva.setFont(btnNueva.getFont().deriveFont(Font.BOLD));
@@ -48,11 +48,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
         UIStyles.applySvgIcon(btnNueva, "/icons/add.svg", 16);
         acciones.add(btnNueva);
 
-        JPanel norte = new JPanel(new GridLayout(2, 1, 0, 2));
-        norte.setOpaque(false);
-        norte.add(acciones);
-        norte.add(filtros);
-        add(norte, BorderLayout.NORTH);
+        add(UIStyles.createBarra(acciones, filtros), BorderLayout.NORTH);
 
         modelo = new DefaultTableModel(new String[]{"Folio", "No. remisión", "Fecha", "Proveedor", "Obra", "Envía",
             "Recibió", "Partidas", "Cantidad total", "Ver / editar", "PDF"}, 0) {
@@ -62,7 +58,7 @@ public class RemisionesPanel extends JPanel implements Pagina {
             }
         };
         JTable tabla = new JTable(modelo);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tabla.getTableHeader().setReorderingAllowed(false);
         UIStyles.styleTableHeader(tabla);

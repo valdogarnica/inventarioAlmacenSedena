@@ -45,7 +45,7 @@ public class DevolucionParcialDialog extends JDialog {
 
         modelo = new DevolucionTableModel();
         tabla = new JTable(modelo);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         tabla.getTableHeader().setReorderingAllowed(false);
         tabla.getColumnModel().getColumn(4).setCellEditor(new SpinnerEditor());
         tabla.getColumnModel().getColumn(4).setCellRenderer(new SpinnerRenderer());

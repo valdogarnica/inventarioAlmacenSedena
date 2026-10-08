@@ -125,7 +125,7 @@ public class RegistrarRemisionDialog extends JDialog {
         // ---------- Partidas
         modelo = new PartidasModel();
         tabla = new JTable(modelo);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         tabla.setSurrendersFocusOnKeystroke(true);
         tabla.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
         tabla.getTableHeader().setReorderingAllowed(false);

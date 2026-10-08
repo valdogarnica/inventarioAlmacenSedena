@@ -37,7 +37,14 @@ public class MainWindow extends JFrame {
     private int totalRegistros = 0;
 
     // Menú paginado
-    private static final Color MENU_BG = new Color(27, 42, 74);
+    private static final Color MENU_BG = new Color(0x0F172A);
+    private static final int ANCHO_MENU = 248;
+    private static final int ANCHO_MENU_CONTRAIDO = 72;
+    private static final int ANCHO_CONTRAER_MENU = 1200;
+    private static final java.util.prefs.Preferences PREFS =
+        java.util.prefs.Preferences.userNodeForPackage(MainWindow.class);
+    private static final String PREF_MENU_CONTRAIDO = "menu_contraido";
+    private static final String PREF_MENU_MANUAL = "menu_manual";
     private static final String PAG_PRESTAMO = "prestamo";
     private static final String PAG_PRESTAMOS = "prestamos";
     private static final String PAG_INVENTARIO = "inventario";
@@ -55,6 +62,15 @@ public class MainWindow extends JFrame {
     private JPanel panelPaginas;
     private JPanel menuLateral;
     private JLabel lblTituloPagina;
+    private JLabel lblSubtituloPagina;
+    private JPanel itemsMenu;
+    private JLabel lblApp;
+    private JLabel lblAtajos;
+    private JButton btnMenu;
+    private boolean menuContraido;
+    private boolean menuManual;
+    private final List<JComponent> seccionesMenu = new ArrayList<>();
+    private final Map<String, String> subtitulosPaginas = new HashMap<>();
     private final ButtonGroup grupoMenu = new ButtonGroup();
     private final Map<String, JToggleButton> botonesMenu = new HashMap<>();
     private final Map<String, JComponent> paginas = new HashMap<>();
@@ -72,7 +88,7 @@ public class MainWindow extends JFrame {
         setTitle("Sistema de Inventario de Almacén");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1280, 760);
-        setMinimumSize(new Dimension(1000, 620));
+        setMinimumSize(new Dimension(880, 580));
         setLocationRelativeTo(null);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         cargarIconoApp();
@@ -86,114 +102,220 @@ public class MainWindow extends JFrame {
         panelPaginas.setOpaque(false);
 
         // Encabezado de la página actual + empleado
-        JPanel encabezado = new JPanel(new BorderLayout());
+        JPanel encabezado = new JPanel(new BorderLayout(12, 0));
         encabezado.setBackground(UIStyles.CARD);
         encabezado.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 1, 0, UIStyles.BORDER),
-            BorderFactory.createEmptyBorder(10, 18, 10, 18)));
+            BorderFactory.createEmptyBorder(12, 22, 12, 18)));
         lblTituloPagina = new JLabel();
-        lblTituloPagina.setFont(lblTituloPagina.getFont().deriveFont(Font.BOLD, 20f));
+        lblTituloPagina.setFont(lblTituloPagina.getFont().deriveFont(Font.BOLD, 21f));
         lblTituloPagina.setForeground(UIStyles.TEXT);
-        encabezado.add(lblTituloPagina, BorderLayout.WEST);
-        JPanel panelEmpleado = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        lblSubtituloPagina = new JLabel();
+        lblSubtituloPagina.setForeground(UIStyles.MUTED);
+        JPanel titulos = new JPanel(new GridLayout(2, 1, 0, 0));
+        titulos.setOpaque(false);
+        titulos.add(lblTituloPagina);
+        titulos.add(lblSubtituloPagina);
+        encabezado.add(titulos, BorderLayout.CENTER);
+
+        JPanel panelEmpleado = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         panelEmpleado.setOpaque(false);
-        JLabel lblEmpleadoTitulo = new JLabel("Empleado:");
-        lblEmpleadoTitulo.setForeground(UIStyles.TEXT);
-        panelEmpleado.add(lblEmpleadoTitulo);
+        JLabel lblIconoEmpleado = new JLabel(icono("/icons/usuario.svg", 18, UIStyles.MUTED));
+        panelEmpleado.add(lblIconoEmpleado);
+        JPanel textoEmpleado = new JPanel(new GridLayout(2, 1, 0, 0));
+        textoEmpleado.setOpaque(false);
+        JLabel lblEmpleadoTitulo = new JLabel("Empleado en turno");
+        lblEmpleadoTitulo.setForeground(UIStyles.MUTED);
+        lblEmpleadoTitulo.setFont(lblEmpleadoTitulo.getFont().deriveFont(11f));
+        textoEmpleado.add(lblEmpleadoTitulo);
         lblEmpleado = new JLabel("No configurado");
         lblEmpleado.setFont(lblEmpleado.getFont().deriveFont(Font.BOLD));
         lblEmpleado.setForeground(UIStyles.TEXT);
-        panelEmpleado.add(lblEmpleado);
+        textoEmpleado.add(lblEmpleado);
+        panelEmpleado.add(textoEmpleado);
         JButton btnCambiarEmpleado = new JButton("Cambiar");
         btnCambiarEmpleado.addActionListener(e -> configurarEmpleado());
         UIStyles.styleSecondaryButton(btnCambiarEmpleado);
-        UIStyles.applySvgIcon(btnCambiarEmpleado, "/icons/edit.svg", 16);
+        UIStyles.applySvgIcon(btnCambiarEmpleado, "/icons/edit.svg", 14);
         panelEmpleado.add(btnCambiarEmpleado);
-        encabezado.add(panelEmpleado, BorderLayout.EAST);
+        JPanel envolturaEmpleado = new JPanel(new GridBagLayout());
+        envolturaEmpleado.setOpaque(false);
+        envolturaEmpleado.add(panelEmpleado);
+        encabezado.add(envolturaEmpleado, BorderLayout.EAST);
 
         JPanel centro = new JPanel(new BorderLayout());
         centro.setOpaque(false);
         centro.add(encabezado, BorderLayout.NORTH);
         JPanel envoltura = new JPanel(new BorderLayout());
         envoltura.setOpaque(false);
-        envoltura.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        envoltura.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
         envoltura.add(panelPaginas, BorderLayout.CENTER);
         centro.add(envoltura, BorderLayout.CENTER);
 
-        // Menú lateral paginado
-        menuLateral = new JPanel();
-        menuLateral.setLayout(new BoxLayout(menuLateral, BoxLayout.Y_AXIS));
+        // Menú lateral contraíble
+        menuLateral = new JPanel(new BorderLayout());
         menuLateral.setBackground(MENU_BG);
-        menuLateral.setBorder(BorderFactory.createEmptyBorder(16, 10, 16, 10));
-        menuLateral.setPreferredSize(new Dimension(230, 100));
-        JLabel lblApp = new JLabel("<html><b>Almacén</b><br><span style='font-size:9px'>Inventario y préstamos</span></html>");
-        lblApp.setForeground(Color.WHITE);
-        lblApp.setFont(lblApp.getFont().deriveFont(17f));
-        lblApp.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lblApp.setBorder(BorderFactory.createEmptyBorder(0, 8, 18, 0));
-        menuLateral.add(lblApp);
+        menuLateral.setBorder(BorderFactory.createEmptyBorder(14, 10, 14, 10));
 
+        JPanel marca = new JPanel(new BorderLayout(8, 0));
+        marca.setOpaque(false);
+        marca.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
+        btnMenu = new JButton(icono("/icons/menu.svg", 20, new Color(0xE2E8F0)));
+        btnMenu.setToolTipText("Contraer o expandir el menú");
+        btnMenu.putClientProperty("FlatLaf.style", "background: #0F172A; hoverBackground: #1E293B; "
+            + "pressedBackground: #334155; focusedBackground: #0F172A; borderWidth: 0; focusWidth: 0; "
+            + "innerFocusWidth: 0; arc: 10; margin: 8,10,8,10");
+        btnMenu.addActionListener(e -> {
+            menuManual = true;
+            setMenuContraido(!menuContraido);
+        });
+        marca.add(btnMenu, BorderLayout.WEST);
+        lblApp = new JLabel("<html><b style='font-size:13px'>Almacén</b><br>"
+            + "<span style='color:#94A3B8'>Inventario y préstamos</span></html>");
+        lblApp.setForeground(Color.WHITE);
+        marca.add(lblApp, BorderLayout.CENTER);
+        menuLateral.add(marca, BorderLayout.NORTH);
+
+        itemsMenu = new JPanel();
+        itemsMenu.setLayout(new BoxLayout(itemsMenu, BoxLayout.Y_AXIS));
+        itemsMenu.setOpaque(false);
         agregarSeccionMenu("PRÉSTAMOS");
-        agregarPagina(PAG_PRESTAMO, "Nuevo préstamo", "/icons/add.svg", crearPaginaPrestamo());
-        agregarPagina(PAG_PRESTAMOS, "Préstamos registrados", "/icons/search.svg", crearPaginaPrestamos());
+        agregarPagina(PAG_PRESTAMO, "Nuevo préstamo", "/icons/carrito.svg", crearPaginaPrestamo(),
+            "Busque material y agréguelo al carrito para prestarlo");
+        agregarPagina(PAG_PRESTAMOS, "Préstamos registrados", "/icons/lista.svg", crearPaginaPrestamos(),
+            "Consulte, devuelva y reporte los préstamos");
         agregarSeccionMenu("ALMACÉN");
-        agregarPagina(PAG_INVENTARIO, "Inventario", "/icons/enlace.svg", new InventarioPanel());
-        agregarPagina(PAG_REMISIONES, "Remisiones", "/icons/save.svg", new RemisionesPanel(this::getEmpleado));
-        agregarPagina(PAG_PROVEEDORES, "Proveedores", "/icons/edit.svg", new ProveedoresPanel());
-        agregarPagina(PAG_CATALOGOS, "Categorías, tipos y unidades", "/icons/refresh.svg", new CatalogosPanel());
+        agregarPagina(PAG_INVENTARIO, "Inventario", "/icons/caja.svg", new InventarioPanel(),
+            "Existencias por material y por proveedor");
+        agregarPagina(PAG_REMISIONES, "Remisiones", "/icons/camion.svg", new RemisionesPanel(this::getEmpleado),
+            "Entradas de material por remisión de proveedor");
+        agregarPagina(PAG_PROVEEDORES, "Proveedores", "/icons/usuarios.svg", new ProveedoresPanel(),
+            "Proveedores con sus materiales y remisiones");
+        agregarPagina(PAG_CATALOGOS, "Categorías, tipos y unidades", "/icons/etiqueta.svg", new CatalogosPanel(),
+            "Catálogos que se eligen al capturar materiales");
         agregarSeccionMenu("CONSULTAS");
-        agregarPagina(PAG_REPORTES, "Reportes", "/icons/report.svg", new ReportesPanel());
-        agregarPagina(PAG_CONFIGURACION, "Configuración", "/icons/edit.svg", crearPaginaConfiguracion());
-        menuLateral.add(Box.createVerticalGlue());
-        JLabel lblAtajos = new JLabel("<html>Ctrl+1 … Ctrl+8 para cambiar de página</html>");
-        lblAtajos.setForeground(new Color(160, 175, 205));
+        agregarPagina(PAG_REPORTES, "Reportes", "/icons/grafica.svg", new ReportesPanel(),
+            "Reportes en PDF listos para imprimir");
+        agregarPagina(PAG_CONFIGURACION, "Configuración", "/icons/ajustes.svg", crearPaginaConfiguracion(),
+            "Base de datos, empleado y salida");
+        itemsMenu.add(Box.createVerticalGlue());
+        JScrollPane scrollMenu = new JScrollPane(itemsMenu,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollMenu.setBorder(null);
+        scrollMenu.setOpaque(false);
+        scrollMenu.getViewport().setOpaque(false);
+        scrollMenu.getVerticalScrollBar().setUnitIncrement(16);
+        menuLateral.add(scrollMenu, BorderLayout.CENTER);
+
+        lblAtajos = new JLabel("<html>Atajos: Ctrl+1 a Ctrl+8 para cambiar de página</html>");
+        lblAtajos.setForeground(new Color(0x94A3B8));
         lblAtajos.setFont(lblAtajos.getFont().deriveFont(11f));
-        lblAtajos.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lblAtajos.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
-        menuLateral.add(lblAtajos);
+        lblAtajos.setBorder(BorderFactory.createEmptyBorder(10, 6, 0, 0));
+        menuLateral.add(lblAtajos, BorderLayout.SOUTH);
 
         raiz.add(menuLateral, BorderLayout.WEST);
         raiz.add(centro, BorderLayout.CENTER);
         setContentPane(raiz);
         registrarAtajos();
+
+        // En pantallas angostas el menú se contrae solo (salvo que el usuario lo haya elegido)
+        menuContraido = PREFS.getBoolean(PREF_MENU_CONTRAIDO, false);
+        menuManual = PREFS.getBoolean(PREF_MENU_MANUAL, false);
+        setMenuContraido(menuContraido);
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                if (!menuManual) {
+                    boolean angosta = getWidth() < ANCHO_CONTRAER_MENU;
+                    if (angosta != menuContraido) {
+                        setMenuContraido(angosta);
+                    }
+                }
+            }
+        });
+    }
+
+    private static Icon icono(String ruta, int tamano, Color color) {
+        try {
+            com.formdev.flatlaf.extras.FlatSVGIcon svg = new com.formdev.flatlaf.extras.FlatSVGIcon(ruta.substring(1), tamano, tamano);
+            svg.setColorFilter(new com.formdev.flatlaf.extras.FlatSVGIcon.ColorFilter(c -> color));
+            return svg;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Contrae el menú a solo iconos (con el nombre como ayuda emergente) o lo expande. */
+    private void setMenuContraido(boolean contraido) {
+        menuContraido = contraido;
+        PREFS.putBoolean(PREF_MENU_CONTRAIDO, contraido);
+        PREFS.putBoolean(PREF_MENU_MANUAL, menuManual);
+        lblApp.setVisible(!contraido);
+        lblAtajos.setVisible(!contraido);
+        for (JComponent seccion : seccionesMenu) {
+            if (seccion instanceof JLabel) {
+                seccion.setVisible(!contraido);
+            } else {
+                seccion.setVisible(contraido);
+            }
+        }
+        for (Map.Entry<String, JToggleButton> e : botonesMenu.entrySet()) {
+            JToggleButton b = e.getValue();
+            String titulo = titulosPaginas.get(e.getKey());
+            b.setText(contraido ? "" : titulo);
+            b.setToolTipText(contraido ? titulo : null);
+            b.setHorizontalAlignment(contraido ? SwingConstants.CENTER : SwingConstants.LEFT);
+        }
+        menuLateral.setPreferredSize(new Dimension(contraido ? ANCHO_MENU_CONTRAIDO : ANCHO_MENU, 100));
+        menuLateral.revalidate();
+        menuLateral.repaint();
     }
 
     private void agregarSeccionMenu(String titulo) {
         JLabel lbl = new JLabel(titulo);
-        lbl.setForeground(new Color(140, 158, 194));
-        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 11f));
+        lbl.setForeground(new Color(0x64748B));
+        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, 10.5f));
         lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lbl.setBorder(BorderFactory.createEmptyBorder(12, 8, 6, 0));
-        menuLateral.add(lbl);
+        lbl.setBorder(BorderFactory.createEmptyBorder(14, 10, 6, 0));
+        itemsMenu.add(lbl);
+        seccionesMenu.add(lbl);
+        // Con el menú contraído, las secciones se ven como una línea
+        JSeparator sep = new JSeparator();
+        sep.setForeground(new Color(0x1E293B));
+        sep.setBackground(new Color(0x1E293B));
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 12));
+        sep.setAlignmentX(Component.LEFT_ALIGNMENT);
+        sep.setVisible(false);
+        itemsMenu.add(sep);
+        seccionesMenu.add(sep);
     }
 
-    private void agregarPagina(String id, String titulo, String icono, JComponent pagina) {
+    private void agregarPagina(String id, String titulo, String icono, JComponent pagina, String subtitulo) {
         panelPaginas.add(pagina, id);
         paginas.put(id, pagina);
         titulosPaginas.put(id, titulo);
+        subtitulosPaginas.put(id, subtitulo);
         ordenPaginas.add(id);
 
         JToggleButton boton = new JToggleButton(titulo);
         boton.setHorizontalAlignment(SwingConstants.LEFT);
         boton.setAlignmentX(Component.LEFT_ALIGNMENT);
-        boton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        boton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         boton.setFocusPainted(false);
         boton.putClientProperty("FlatLaf.style",
-            "background: #1B2A4A; foreground: #DCE4F5; selectedBackground: #2D6CDF; selectedForeground: #FFFFFF; " +
-            "hoverBackground: #26385F; pressedBackground: #2D6CDF; borderWidth: 0; focusWidth: 0; arc: 10; margin: 8,12,8,12");
-        try {
-            com.formdev.flatlaf.extras.FlatSVGIcon svg = new com.formdev.flatlaf.extras.FlatSVGIcon(icono.substring(1), 16, 16);
-            svg.setColorFilter(new com.formdev.flatlaf.extras.FlatSVGIcon.ColorFilter(c -> Color.WHITE));
-            boton.setIcon(svg);
-            boton.setIconTextGap(10);
-        } catch (Exception ignored) {
-            // Sin icono
+            "background: #0F172A; foreground: #CBD5E1; selectedBackground: #2563EB; selectedForeground: #FFFFFF; " +
+            "hoverBackground: #1E293B; pressedBackground: #1D4ED8; focusedBackground: #0F172A; " +
+            "borderWidth: 0; focusWidth: 0; innerFocusWidth: 0; arc: 10; margin: 9,12,9,12");
+        Icon ic = icono(icono, 18, new Color(0xE2E8F0));
+        if (ic != null) {
+            boton.setIcon(ic);
+            boton.setIconTextGap(12);
         }
         boton.addActionListener(e -> mostrarPagina(id));
         grupoMenu.add(boton);
         botonesMenu.put(id, boton);
-        menuLateral.add(boton);
-        menuLateral.add(Box.createVerticalStrut(4));
+        itemsMenu.add(boton);
+        itemsMenu.add(Box.createVerticalStrut(4));
     }
 
     private void registrarAtajos() {
@@ -215,6 +337,7 @@ public class MainWindow extends JFrame {
     private void mostrarPagina(String id) {
         cardLayout.show(panelPaginas, id);
         lblTituloPagina.setText(titulosPaginas.get(id));
+        lblSubtituloPagina.setText(subtitulosPaginas.getOrDefault(id, ""));
         JToggleButton boton = botonesMenu.get(id);
         if (boton != null && !boton.isSelected()) {
             boton.setSelected(true);
@@ -252,7 +375,8 @@ public class MainWindow extends JFrame {
         lblBuscar.setForeground(UIStyles.TEXT);
         panelBusqueda.add(lblBuscar, BorderLayout.WEST);
         txtBusqueda = new JTextField();
-        txtBusqueda.setPreferredSize(new Dimension(320, 32));
+        txtBusqueda.putClientProperty("JTextField.placeholderText", "Escriba nombre, categoría, tipo, unidad o proveedor…");
+        txtBusqueda.putClientProperty("JTextField.showClearButton", true);
         txtBusqueda.setToolTipText("Nombre, categoría, tipo, unidad o proveedor");
         configurarBusquedaEnVivo();
         JButton btnBuscar = new JButton("Buscar");
@@ -260,12 +384,9 @@ public class MainWindow extends JFrame {
         UIStyles.stylePrimaryButton(btnBuscar);
         UIStyles.tamanoMinimo(btnBuscar, 120, 34);
         UIStyles.applySvgIcon(btnBuscar, "/icons/search.svg", 16);
-        JPanel panelBuscarBtn = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panelBuscarBtn.setOpaque(false);
-        panelBuscarBtn.add(txtBusqueda);
-        panelBuscarBtn.add(btnBuscar);
-        panelBusqueda.add(panelBuscarBtn, BorderLayout.CENTER);
-        JPanel cardBusqueda = UIStyles.createCard("Busqueda", panelBusqueda);
+        panelBusqueda.add(txtBusqueda, BorderLayout.CENTER);
+        panelBusqueda.add(btnBuscar, BorderLayout.EAST);
+        JPanel cardBusqueda = UIStyles.createCard("Búsqueda", panelBusqueda);
         panelIzquierdo.add(cardBusqueda, BorderLayout.NORTH);
         
         // Tabla de herramientas
@@ -273,11 +394,13 @@ public class MainWindow extends JFrame {
         tablaHerramientas = new JTable(modeloTabla);
         tablaHerramientas.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaHerramientas.getTableHeader().setReorderingAllowed(false);
-        tablaHerramientas.setRowHeight(28);
+        tablaHerramientas.setRowHeight(32);
         tablaHerramientas.getColumnModel().getColumn(COL_ID).setPreferredWidth(45);
         tablaHerramientas.getColumnModel().getColumn(COL_NOMBRE).setPreferredWidth(200);
         tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setPreferredWidth(90);
-        tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setPreferredWidth(70);
+        tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setMinWidth(80);
+        tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setPreferredWidth(80);
+        tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setMinWidth(76);
         tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setCellEditor(new CantidadSpinnerEditor());
         tablaHerramientas.getColumnModel().getColumn(COL_CANTIDAD).setCellRenderer(new CantidadSpinnerRenderer());
         tablaHerramientas.getColumnModel().getColumn(COL_AGREGAR).setCellRenderer(new BotonAgregarRenderer());
@@ -288,11 +411,11 @@ public class MainWindow extends JFrame {
         tablaHerramientas.getColumnModel().getColumn(COL_ID).setCellRenderer(centerRenderer);
         tablaHerramientas.getColumnModel().getColumn(COL_STOCK).setCellRenderer(centerRenderer);
         JScrollPane scrollHerramientas = new JScrollPane(tablaHerramientas);
-        scrollHerramientas.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
         JPanel cardResultados = UIStyles.createCard("Resultados", scrollHerramientas);
         
         // Panel de paginación
-        JPanel panelPaginacion = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel panelPaginacion = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 2));
         panelPaginacion.setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
         lblTamano.setForeground(UIStyles.TEXT);
@@ -350,7 +473,7 @@ public class MainWindow extends JFrame {
         tablaCarrito = new JTable(modeloCarrito);
         tablaCarrito.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaCarrito.getTableHeader().setReorderingAllowed(false);
-        tablaCarrito.setRowHeight(28);
+        tablaCarrito.setRowHeight(32);
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaCarrito);
         DefaultTableCellRenderer centerRendererCarrito = UIStyles.createCenteredNumberRenderer();
@@ -393,7 +516,18 @@ public class MainWindow extends JFrame {
         
         splitPane.setLeftComponent(panelIzquierdo);
         splitPane.setRightComponent(panelDerecho);
-        splitPane.setDividerLocation(780);
+        // El reparto entre resultados y carrito se ajusta al ancho de la pantalla
+        panelIzquierdo.setMinimumSize(new Dimension(420, 200));
+        panelDerecho.setMinimumSize(new Dimension(300, 200));
+        splitPane.addHierarchyListener(new java.awt.event.HierarchyListener() {
+            @Override
+            public void hierarchyChanged(java.awt.event.HierarchyEvent e) {
+                if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && splitPane.isShowing()) {
+                    splitPane.removeHierarchyListener(this);
+                    SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(0.66));
+                }
+            }
+        });
         splitPane.setResizeWeight(0.62);
         
         panelPrincipal.add(splitPane, BorderLayout.CENTER);
@@ -416,7 +550,7 @@ public class MainWindow extends JFrame {
 
     /** Página "Préstamos registrados": accesos a activos, devueltos y materiales prestados. */
     private JComponent crearPaginaPrestamos() {
-        JPanel grid = new JPanel(new GridLayout(1, 3, 14, 14));
+        JPanel grid = new JPanel(new GridResponsivo(260, 3, 14, 14));
         grid.setOpaque(false);
         grid.add(tarjetaAccion("Préstamos activos",
             "Consultar préstamos, registrar devoluciones (totales o parciales) y generar reportes.",
@@ -435,7 +569,7 @@ public class MainWindow extends JFrame {
 
     /** Página "Configuración": base de datos y empleado. */
     private JComponent crearPaginaConfiguracion() {
-        JPanel grid = new JPanel(new GridLayout(1, 3, 14, 14));
+        JPanel grid = new JPanel(new GridResponsivo(260, 3, 14, 14));
         grid.setOpaque(false);
         grid.add(tarjetaAccion("Base de datos",
             "Elegir la carpeta donde se guarda toda la información y la base de datos. Cada base tiene su carpeta de fotos.",
@@ -458,7 +592,7 @@ public class MainWindow extends JFrame {
     private JPanel tarjetaAccion(String titulo, String descripcion, String textoBoton, String icono, Runnable accion) {
         JPanel cuerpo = new JPanel(new BorderLayout(8, 12));
         cuerpo.setOpaque(false);
-        JLabel lbl = new JLabel("<html><div style='width:240px'>" + descripcion + "</div></html>");
+        JComponent lbl = UIStyles.textoAjustable(descripcion);
         lbl.setForeground(new Color(90, 100, 120));
         cuerpo.add(lbl, BorderLayout.CENTER);
         JButton btn = new JButton(textoBoton);

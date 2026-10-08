@@ -69,7 +69,7 @@ public class MaterialesPrestadosDialog extends JDialog {
             }
         };
         tabla = new JTable(modelo);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         tabla.getTableHeader().setReorderingAllowed(false);
         UIStyles.styleTableHeader(tabla);
         DefaultTableCellRenderer center = UIStyles.createCenteredNumberRenderer();

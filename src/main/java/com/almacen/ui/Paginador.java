@@ -16,7 +16,7 @@ public class Paginador extends JPanel {
     private int paginaActual = 1;
 
     public Paginador(Integer[] tamanos, int tamanoInicial, IntConsumer cargador) {
-        super(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+        super(new WrapLayout(FlowLayout.RIGHT, 8, 4));
         setOpaque(false);
         JLabel lblTamano = new JLabel("Registros por página:");
         lblTamano.setForeground(UIStyles.TEXT);

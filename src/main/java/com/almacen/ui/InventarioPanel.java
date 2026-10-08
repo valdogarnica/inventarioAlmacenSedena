@@ -47,7 +47,7 @@ public class InventarioPanel extends JPanel implements Pagina {
     }
 
     private void initComponents() {
-        JPanel filtros = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        JPanel filtros = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         filtros.setOpaque(false);
         JLabel lblFiltro = new JLabel("Buscar:");
         lblFiltro.setForeground(UIStyles.TEXT);
@@ -74,7 +74,7 @@ public class InventarioPanel extends JPanel implements Pagina {
         UIStyles.styleSecondaryButton(btnLimpiar);
         filtros.add(btnLimpiar);
 
-        JPanel acciones = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        JPanel acciones = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         acciones.setOpaque(false);
         JButton btnAgregar = new JButton("Agregar material");
         btnAgregar.addActionListener(e -> agregar());
@@ -113,11 +113,7 @@ public class InventarioPanel extends JPanel implements Pagina {
         acciones.add(btnVistaTotal);
         acciones.add(btnVistaDetalle);
 
-        JPanel norte = new JPanel(new GridLayout(2, 1, 0, 2));
-        norte.setOpaque(false);
-        norte.add(acciones);
-        norte.add(filtros);
-        add(norte, BorderLayout.NORTH);
+        add(UIStyles.createBarra(acciones, filtros), BorderLayout.NORTH);
 
         String[] columnas = {"ID", "Material", "Categoría", "Tipo", "Unidad", "Proveedor", "Stock",
             "Últ. remisión", "Fecha alta", "Descripción", "Editar", "Baja"};
@@ -130,7 +126,7 @@ public class InventarioPanel extends JPanel implements Pagina {
         tabla = new JTable(modelo);
         tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tabla.getTableHeader().setReorderingAllowed(false);
-        tabla.setRowHeight(28);
+        tabla.setRowHeight(32);
         UIStyles.styleTableHeader(tabla);
         tabla.getColumnModel().getColumn(COL_ID).setCellRenderer(UIStyles.createCenteredNumberRenderer());
         tabla.getColumnModel().getColumn(6).setCellRenderer(UIStyles.createCenteredNumberRenderer());
@@ -152,7 +148,7 @@ public class InventarioPanel extends JPanel implements Pagina {
         };
         JTable tablaAgrupada = new JTable(modeloAgrupado);
         tablaAgrupada.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tablaAgrupada.setRowHeight(28);
+        tablaAgrupada.setRowHeight(32);
         UIStyles.styleTableHeader(tablaAgrupada);
         int[] anchosAgrupado = {220, 70, 160, 110, 340, 80, 80, 70, 70};
         for (int i = 0; i < anchosAgrupado.length; i++) {

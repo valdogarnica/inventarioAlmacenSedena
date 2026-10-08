@@ -30,7 +30,7 @@ public class ProveedoresPanel extends JPanel implements Pagina {
     }
 
     private void initComponents() {
-        JPanel acciones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+        JPanel acciones = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
         acciones.setOpaque(false);
         JButton btnNuevo = new JButton("Nuevo proveedor");
         btnNuevo.addActionListener(e -> nuevo());
@@ -56,7 +56,7 @@ public class ProveedoresPanel extends JPanel implements Pagina {
             }
         };
         tablaProveedores = new JTable(modeloProveedores);
-        tablaProveedores.setRowHeight(28);
+        tablaProveedores.setRowHeight(32);
         tablaProveedores.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaProveedores.getTableHeader().setReorderingAllowed(false);
         UIStyles.styleTableHeader(tablaProveedores);
@@ -86,7 +86,7 @@ public class ProveedoresPanel extends JPanel implements Pagina {
             }
         };
         JTable tablaMateriales = new JTable(modeloMateriales);
-        tablaMateriales.setRowHeight(26);
+        tablaMateriales.setRowHeight(32);
         tablaMateriales.getTableHeader().setReorderingAllowed(false);
         UIStyles.styleTableHeader(tablaMateriales);
         tablaMateriales.getColumnModel().getColumn(0).setCellRenderer(UIStyles.createCenteredNumberRenderer());
@@ -100,7 +100,7 @@ public class ProveedoresPanel extends JPanel implements Pagina {
             }
         };
         JTable tablaRemisiones = new JTable(modeloRemisiones);
-        tablaRemisiones.setRowHeight(26);
+        tablaRemisiones.setRowHeight(32);
         tablaRemisiones.getTableHeader().setReorderingAllowed(false);
         UIStyles.styleTableHeader(tablaRemisiones);
         tablaRemisiones.addMouseListener(new java.awt.event.MouseAdapter() {

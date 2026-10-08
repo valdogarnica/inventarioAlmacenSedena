@@ -121,7 +121,7 @@ public class VerPrestamosDevueltosDialog extends JDialog {
         tablaPrestamos = new JTable(modelo);
         tablaPrestamos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaPrestamos.getTableHeader().setReorderingAllowed(false);
-        tablaPrestamos.setRowHeight(28);
+        tablaPrestamos.setRowHeight(32);
         tablaPrestamos.getColumnModel().getColumn(10).setPreferredWidth(90);
         tablaPrestamos.getColumnModel().getColumn(11).setPreferredWidth(130);
         tablaPrestamos.getColumnModel().getColumn(10).setCellRenderer(new VerFotoRenderer());

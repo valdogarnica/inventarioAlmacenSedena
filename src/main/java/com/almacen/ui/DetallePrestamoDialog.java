@@ -34,7 +34,7 @@ public class DetallePrestamoDialog extends JDialog {
             }
         };
         tablaDetalle = new JTable(modelo);
-        tablaDetalle.setRowHeight(28);
+        tablaDetalle.setRowHeight(32);
         tablaDetalle.getTableHeader().setReorderingAllowed(false);
         // Estilizar encabezado y centrar números
         UIStyles.styleTableHeader(tablaDetalle);
