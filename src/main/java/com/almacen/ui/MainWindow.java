@@ -227,7 +227,7 @@ public class MainWindow extends JFrame {
         scrollMenu.getVerticalScrollBar().setUnitIncrement(16);
         menuLateral.add(scrollMenu, BorderLayout.CENTER);
 
-        lblAtajos = new JLabel("<html>V1.0 by DevG2 Studios<</html>");
+        lblAtajos = new JLabel("<html>V2.0.0 by DevG2 Studios<</html>");
         lblAtajos.putClientProperty("FlatLaf.style", "foreground: $App.menuMuted");
         lblAtajos.setFont(lblAtajos.getFont().deriveFont(11f));
         lblAtajos.setBorder(BorderFactory.createEmptyBorder(10, 6, 0, 0));
