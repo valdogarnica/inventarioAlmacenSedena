@@ -11,6 +11,8 @@ import com.almacen.model.DetalleRemision;
 import com.almacen.model.Proveedor;
 import com.almacen.model.Remision;
 import com.almacen.model.ResumenInicio;
+import com.almacen.model.Usuario;
+import com.almacen.seguridad.Contrasenas;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,6 +35,7 @@ public class DatabaseManager {
     }
     
     public boolean connect(String dbPath) {
+        disconnect();
         try {
             this.dbPath = dbPath;
             String url = "jdbc:sqlite:" + dbPath;
@@ -65,6 +68,20 @@ public class DatabaseManager {
     
     public String getDbPath() {
         return dbPath;
+    }
+
+    /**
+     * Crea una base de datos nueva (con su usuario admin inicial) sin tocar la conexión
+     * en uso. Devuelve false si el archivo ya existe o no se pudo crear.
+     */
+    public static boolean crearBaseDatos(String ruta) {
+        if (new java.io.File(ruta).exists()) {
+            return false;
+        }
+        DatabaseManager nueva = new DatabaseManager();
+        boolean creada = nueva.connect(ruta);
+        nueva.disconnect();
+        return creada;
     }
     
     private void createTables() throws SQLException {
@@ -172,7 +189,18 @@ public class DatabaseManager {
                 "FOREIGN KEY (prestamo_id) REFERENCES prestamos(id), " +
                 "FOREIGN KEY (herramienta_id) REFERENCES herramientas(id))";
 
+        // Usuarios que pueden entrar al sistema (contraseña guardada con hash y sal)
+        String createUsuarios = "CREATE TABLE IF NOT EXISTS usuarios (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "usuario TEXT NOT NULL UNIQUE COLLATE NOCASE, " +
+                "nombre TEXT NOT NULL, " +
+                "contrasena TEXT NOT NULL, " +
+                "rol TEXT NOT NULL DEFAULT '" + Usuario.ROL_EMPLEADO + "', " +
+                "activo INTEGER NOT NULL DEFAULT 1, " +
+                "fecha_registro TEXT)";
+
         try (Statement stmt = connection.createStatement()) {
+            stmt.execute(createUsuarios);
             stmt.execute(createCategorias);
             stmt.execute(createTipos);
             stmt.execute(createUnidades);
@@ -200,6 +228,142 @@ public class DatabaseManager {
         // Insertar datos de ejemplo si la tabla está vacía
         insertarDatosEjemplo();
         migrarNoRetorno();
+        asegurarAdministrador();
+    }
+
+    /**
+     * Toda base (nueva o de una versión anterior) debe tener un administrador; si no hay
+     * ninguno se crea el inicial: usuario "admin", contraseña "admin123".
+     */
+    private void asegurarAdministrador() throws SQLException {
+        try (PreparedStatement pstmt = connection.prepareStatement(
+                "SELECT COUNT(*) FROM usuarios WHERE rol = ?")) {
+            pstmt.setString(1, Usuario.ROL_ADMIN);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return;
+                }
+            }
+        }
+        String sql = "INSERT INTO usuarios (usuario, nombre, contrasena, rol, activo, fecha_registro) " +
+                "VALUES (?, ?, ?, ?, 1, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, Contrasenas.ADMIN_INICIAL);
+            pstmt.setString(2, "ADMINISTRADOR");
+            pstmt.setString(3, Contrasenas.hash(Contrasenas.CONTRASENA_INICIAL.toCharArray()));
+            pstmt.setString(4, Usuario.ROL_ADMIN);
+            pstmt.setString(5, LocalDateTime.now().toString());
+            pstmt.executeUpdate();
+        }
+    }
+
+    // ==================== USUARIOS ====================
+
+    /**
+     * Valida usuario y contraseña contra los usuarios de esta base. Devuelve el usuario
+     * si las credenciales son correctas y está activo; si no, null.
+     */
+    public Usuario autenticar(String usuario, char[] contrasena) throws SQLException {
+        String sql = "SELECT id, usuario, nombre, rol, activo, contrasena FROM usuarios WHERE usuario = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, usuario == null ? "" : usuario.trim());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (!rs.next()) {
+                    // Mismo costo que una contraseña real para no delatar qué usuarios existen
+                    Contrasenas.verificar(contrasena, Contrasenas.hash(new char[]{' '}));
+                    return null;
+                }
+                Usuario u = leerUsuario(rs);
+                if (!Contrasenas.verificar(contrasena, rs.getString("contrasena")) || !u.isActivo()) {
+                    return null;
+                }
+                return u;
+            }
+        }
+    }
+
+    public List<Usuario> obtenerUsuarios() throws SQLException {
+        List<Usuario> usuarios = new ArrayList<>();
+        String sql = "SELECT id, usuario, nombre, rol, activo FROM usuarios " +
+                "ORDER BY CASE rol WHEN '" + Usuario.ROL_ADMIN + "' THEN 0 ELSE 1 END, nombre COLLATE NOCASE";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                usuarios.add(leerUsuario(rs));
+            }
+        }
+        return usuarios;
+    }
+
+    private static Usuario leerUsuario(ResultSet rs) throws SQLException {
+        return new Usuario(rs.getInt("id"), rs.getString("usuario"), rs.getString("nombre"),
+                rs.getString("rol"), rs.getInt("activo") == 1);
+    }
+
+    public boolean existeUsuario(String usuario, int excluirId) throws SQLException {
+        try (PreparedStatement pstmt = connection.prepareStatement(
+                "SELECT COUNT(*) FROM usuarios WHERE usuario = ? AND id <> ?")) {
+            pstmt.setString(1, usuario.trim());
+            pstmt.setInt(2, excluirId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
+    /** Registra un empleado. Devuelve su id, o -1 si el nombre de usuario ya existe. */
+    public int agregarEmpleado(Usuario u, char[] contrasena) throws SQLException {
+        if (existeUsuario(u.getUsuario(), 0)) {
+            return -1;
+        }
+        String sql = "INSERT INTO usuarios (usuario, nombre, contrasena, rol, activo, fecha_registro) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, u.getUsuario().trim());
+            pstmt.setString(2, u.getNombre().trim());
+            pstmt.setString(3, Contrasenas.hash(contrasena));
+            pstmt.setString(4, Usuario.ROL_EMPLEADO);
+            pstmt.setInt(5, u.isActivo() ? 1 : 0);
+            pstmt.setString(6, LocalDateTime.now().toString());
+            pstmt.executeUpdate();
+            try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                return rs.next() ? rs.getInt(1) : -1;
+            }
+        }
+    }
+
+    /**
+     * Actualiza usuario, nombre y estado; la contraseña solo cambia si se da una nueva.
+     * El administrador nunca queda inactivo. Devuelve false si el nombre de usuario ya lo usa otro.
+     */
+    public boolean actualizarUsuario(Usuario u, char[] nuevaContrasena) throws SQLException {
+        if (existeUsuario(u.getUsuario(), u.getId())) {
+            return false;
+        }
+        boolean cambiaContrasena = nuevaContrasena != null && nuevaContrasena.length > 0;
+        String sql = "UPDATE usuarios SET usuario = ?, nombre = ?, " +
+                "activo = CASE WHEN rol = '" + Usuario.ROL_ADMIN + "' THEN 1 ELSE ? END" +
+                (cambiaContrasena ? ", contrasena = ?" : "") + " WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            int i = 1;
+            pstmt.setString(i++, u.getUsuario().trim());
+            pstmt.setString(i++, u.getNombre().trim());
+            pstmt.setInt(i++, u.isActivo() ? 1 : 0);
+            if (cambiaContrasena) {
+                pstmt.setString(i++, Contrasenas.hash(nuevaContrasena));
+            }
+            pstmt.setInt(i, u.getId());
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    /** Comprueba la contraseña actual de un usuario (por ejemplo, antes de cambiarla). */
+    public boolean verificarContrasena(int idUsuario, char[] contrasena) throws SQLException {
+        try (PreparedStatement pstmt = connection.prepareStatement("SELECT contrasena FROM usuarios WHERE id = ?")) {
+            pstmt.setInt(1, idUsuario);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && Contrasenas.verificar(contrasena, rs.getString(1));
+            }
+        }
     }
 
     /**

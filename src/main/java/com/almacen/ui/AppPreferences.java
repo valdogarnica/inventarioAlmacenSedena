@@ -18,6 +18,7 @@ public final class AppPreferences {
     private static final String SUFIJO_FOTOS = "Fotos";
     private static final String KEY_MAYUSCULAS = "escribir_mayusculas";
     private static final String KEY_UMBRAL_STOCK_BAJO = "umbral_stock_bajo";
+    private static final String KEY_ULTIMO_USUARIO = "ultimo_usuario";
 
     private AppPreferences() {
     }
@@ -115,5 +116,16 @@ public final class AppPreferences {
 
     public static void setUmbralStockBajo(int umbral) {
         PREFS.putInt(KEY_UMBRAL_STOCK_BAJO, umbral);
+    }
+
+    /** Último usuario que inició sesión (se sugiere en el inicio de sesión; nunca la contraseña). */
+    public static String getUltimoUsuario() {
+        return PREFS.get(KEY_ULTIMO_USUARIO, "");
+    }
+
+    public static void setUltimoUsuario(String usuario) {
+        if (usuario != null) {
+            PREFS.put(KEY_ULTIMO_USUARIO, usuario);
+        }
     }
 }
