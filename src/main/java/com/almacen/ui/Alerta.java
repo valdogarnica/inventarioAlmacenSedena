@@ -165,6 +165,9 @@ public final class Alerta {
                 }
             });
             pack();
+            // El texto con ajuste de línea solo sabe cuántas líneas ocupa cuando ya tiene
+            // ancho; el segundo pack toma la altura real (si no, los mensajes largos se cortan)
+            pack();
             Dimension tam = getSize();
             setSize(Math.max(tam.width, 380), tam.height);
             setLocationRelativeTo(getOwner());

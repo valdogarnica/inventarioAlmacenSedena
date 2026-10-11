@@ -3,6 +3,8 @@ package com.almacen.ui;
 import com.almacen.database.DatabaseManager;
 import com.almacen.model.Herramienta;
 import com.almacen.model.ItemCarrito;
+import com.almacen.model.Usuario;
+import com.almacen.seguridad.Sesion;
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableModel;
@@ -84,11 +86,16 @@ public class MainWindow extends JFrame {
     private final Map<String, String> titulosPaginas = new HashMap<>();
     private final List<String> ordenPaginas = new ArrayList<>();
     private String paginaVisible = PAG_INICIO;
-    
-    public MainWindow() {
+    /** Usuario que inició sesión; su nombre es el empleado en turno. */
+    private final Usuario usuarioSesion;
+
+    public MainWindow(Usuario usuarioSesion) {
+        this.usuarioSesion = usuarioSesion;
         carrito = new ArrayList<>();
         initComponents();
-        verificarConexion();
+        lblEmpleado.setText(usuarioSesion.getNombre());
+        // Al iniciar se muestra el resumen del almacén
+        mostrarPagina(PAG_INICIO);
     }
     
     private void initComponents() {
@@ -146,11 +153,12 @@ public class MainWindow extends JFrame {
         lblEmpleado.setFont(lblEmpleado.getFont().deriveFont(Font.BOLD));
         textoEmpleado.add(lblEmpleado);
         panelEmpleado.add(textoEmpleado);
-        JButton btnCambiarEmpleado = new JButton("Cambiar");
-        btnCambiarEmpleado.addActionListener(e -> configurarEmpleado());
-        UIStyles.styleSecondaryButton(btnCambiarEmpleado);
-        UIStyles.applySvgIcon(btnCambiarEmpleado, "/icons/edit.svg", 14);
-        panelEmpleado.add(btnCambiarEmpleado);
+        JButton btnCerrarSesion = new JButton("Cerrar sesión");
+        btnCerrarSesion.setToolTipText("Salir de la sesión para entrar con otro usuario o elegir otra base de datos");
+        btnCerrarSesion.addActionListener(e -> cerrarSesion());
+        UIStyles.styleSecondaryButton(btnCerrarSesion);
+        UIStyles.applySvgIcon(btnCerrarSesion, "/icons/cerrar.svg", 14);
+        panelEmpleado.add(btnCerrarSesion);
         JPanel envolturaEmpleado = new JPanel(new GridBagLayout());
         envolturaEmpleado.setOpaque(false);
         envolturaEmpleado.add(panelEmpleado);
@@ -217,7 +225,7 @@ public class MainWindow extends JFrame {
         agregarPagina(PAG_REPORTES, "Reportes", "/icons/grafica.svg", new ReportesPanel(),
             "Reportes en PDF listos para imprimir");
         agregarPagina(PAG_CONFIGURACION, "Configuración", "/icons/ajustes.svg", crearPaginaConfiguracion(),
-            "Base de datos, empleado y salida");
+            "Sesión, base de datos, empleados y salida");
         itemsMenu.add(Box.createVerticalGlue());
         JScrollPane scrollMenu = new JScrollPane(itemsMenu,
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -656,19 +664,24 @@ public class MainWindow extends JFrame {
         return pagina;
     }
 
-    /** Página "Configuración": base de datos y empleado. */
+    /** Página "Configuración": sesión, base de datos y, para el administrador, empleados y bases. */
     private JComponent crearPaginaConfiguracion() {
         JPanel grid = new JPanel(new GridResponsivo(260, 3, 14, 14));
         grid.setOpaque(false);
-        grid.add(tarjetaAccion("Base de datos",
-            "Elegir la carpeta donde se guarda toda la información y la base de datos. Cada base tiene su carpeta de fotos.",
-            "Configurar", "/icons/edit.svg", () -> {
-                abrirConfiguracion();
-                mostrarPagina(paginaVisible);
-            }));
-        grid.add(tarjetaAccion("Empleado en turno",
-            "Cambiar el nombre del empleado que registra préstamos y recibe remisiones.",
-            "Cambiar", "/icons/edit.svg", this::configurarEmpleado));
+        grid.add(tarjetaAccion("Sesión y base de datos",
+            "Cerrar la sesión para entrar con otro usuario o elegir otra base de datos de la carpeta de información.",
+            "Cerrar sesión", "/icons/cerrar.svg", this::cerrarSesion));
+        if (usuarioSesion.isAdmin()) {
+            grid.add(tarjetaAccion("Empleados",
+                "Registrar a los empleados que pueden iniciar sesión, cambiar sus datos y contraseñas o desactivarlos.",
+                "Administrar", "/icons/usuarios.svg", () -> new EmpleadosDialog(this).setVisible(true)));
+            grid.add(tarjetaAccion("Cuenta de administrador",
+                "Cambiar el usuario y la contraseña del administrador.",
+                "Cambiar", "/icons/usuario.svg", this::cambiarCuentaAdministrador));
+            grid.add(tarjetaAccion("Crear base de datos",
+                "Crear una base de datos nueva en la carpeta de información, con su propio administrador inicial.",
+                "Crear", "/icons/add.svg", () -> AdministracionSistema.crearBaseDatos(this)));
+        }
         grid.add(tarjetaMayusculas());
         grid.add(tarjetaAccion("Salir",
             "Cerrar el sistema.",
@@ -728,40 +741,32 @@ public class MainWindow extends JFrame {
         }
     }
     
-    private void verificarConexion() {
-        DatabaseManager dbManager = DatabaseManager.getInstance();
-        if (!dbManager.isConnected()) {
-            abrirConfiguracion();
+    /** Cierra la sesión y vuelve al inicio de sesión (y a elegir la base de datos). */
+    private void cerrarSesion() {
+        String mensaje = carrito.isEmpty() ? "¿Desea cerrar la sesión?"
+            : "Hay material en el carrito que no se ha prestado y se perderá. ¿Desea cerrar la sesión?";
+        if (!Alerta.confirmar(this, mensaje, "Cerrar sesión")) {
+            return;
         }
-        if (AppPreferences.getPhotoFolderPath().isEmpty()) {
-            abrirConfiguracion();
-        }
-        configurarEmpleado();
-        // Al iniciar se muestra el resumen del almacén
-        mostrarPagina(PAG_INICIO);
+        dispose();
+        DatabaseManager.getInstance().disconnect();
+        Sesion.cerrar();
+        SwingUtilities.invokeLater(com.almacen.Main::iniciarSesion);
     }
-    
-    private void abrirConfiguracion() {
-        ConfiguracionDBDialog dialog = new ConfiguracionDBDialog(this);
-        dialog.setVisible(true);
-    }
-    
-    private void configurarEmpleado() {
-        while (true) {
-            String empleado = Alerta.pedirTexto(this,
-                "Ingrese su nombre para registrar préstamos y remisiones.",
-                "Empleado en turno", null);
 
-            if (empleado != null && !empleado.trim().isEmpty()) {
-                lblEmpleado.setText(empleado.trim());
-                break;
-            }
-            Notificaciones.showMessageDialog(this,
-                "Debe ingresar un nombre para continuar.",
-                "Nombre requerido", JOptionPane.WARNING_MESSAGE);
+    private void cambiarCuentaAdministrador() {
+        UsuarioFormDialog dialog = UsuarioFormDialog.cuentaAdministrador(this, usuarioSesion);
+        dialog.setVisible(true);
+        Usuario guardado = dialog.getGuardado();
+        if (guardado != null) {
+            usuarioSesion.setUsuario(guardado.getUsuario());
+            usuarioSesion.setNombre(guardado.getNombre());
+            lblEmpleado.setText(guardado.getNombre());
+            AppPreferences.setUltimoUsuario(guardado.getUsuario());
+            Notificaciones.exito(this, "Cuenta de administrador actualizada");
         }
     }
-    
+
     private void buscarHerramientas() {
         cargarPagina(1);
     }
